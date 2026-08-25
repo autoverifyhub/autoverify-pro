@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   ShieldCheck, ShieldAlert, Lock, Unlock, FileText, CheckCircle2,
   XCircle, Search, Eye, DollarSign, Car, Building, Fingerprint,
-  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight
+  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard
 } from 'lucide-react';
 
 const INITIAL_DEALERSHIPS = [
@@ -28,6 +28,17 @@ const INITIAL_DEALS = [
       lastDepositDate: '2026-08-15',
       confidence: '99.4% (AWS Textract)'
     },
+    idDetails: {
+      type: "Driver's License (Ontario / ON)",
+      documentNumber: 'J1094-84920-60824',
+      expiryDate: '2029-11-14',
+      extractedText: {
+        fullName: 'JENKINS, SARAH ELIZABETH',
+        dob: '1992-04-18',
+        address: '1428 BAYVIEW AVE, TORONTO ON M4G 3A7',
+        issuingAuthority: 'Ministry of Transportation Ontario'
+      }
+    },
     verifications: {
       income: { status: 'PASSED', verifiedAmount: 8450, details: 'Verified recurring direct deposits via AWS Textract.' },
       id: { status: 'PASSED', score: 99.2, details: 'AAMVA Driver License validated. Biometric liveness matched.' },
@@ -42,7 +53,7 @@ export default function App() {
   const [dealerships] = useState(INITIAL_DEALERSHIPS);
 
   // Navigation & Modal States
-  const [activeTab, setActiveTab] = useState('DASHBOARD'); // 'DASHBOARD' or 'DEALERSHIPS'
+  const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [isAddDealOpen, setIsAddDealOpen] = useState(false);
   const [activeVerifyDeal, setActiveVerifyDeal] = useState(null);
   const [inspectingDeal, setInspectingDeal] = useState(null);
@@ -107,6 +118,17 @@ export default function App() {
         lastDepositDate: 'N/A',
         confidence: 'Pending'
       },
+      idDetails: {
+        type: "Driver's License (Pending Scan)",
+        documentNumber: 'PENDING-OCR',
+        expiryDate: 'N/A',
+        extractedText: {
+          fullName: newDealForm.clientName.toUpperCase(),
+          dob: 'Pending Verification',
+          address: 'Pending OCR Scan',
+          issuingAuthority: 'Provincial Ministry'
+        }
+      },
       verifications: {
         income: { status: 'PENDING', verifiedAmount: 0, details: 'Awaiting Bank E-Statement Upload.' },
         id: { status: 'PENDING', score: 0, details: 'Awaiting Driver License & Selfie Scan.' },
@@ -160,6 +182,17 @@ export default function App() {
       setIsAnalyzingBiometrics(false);
       setDeals(prev => prev.map(d => d.id === activeVerifyDeal.id ? {
         ...d,
+        idDetails: {
+          type: "Driver's License (Canadian Provincial)",
+          documentNumber: 'B8492-10294-85920',
+          expiryDate: '2028-05-22',
+          extractedText: {
+            fullName: d.client.name.toUpperCase(),
+            dob: '1988-09-12',
+            address: '742 EVERGREEN TERRACE, VANCOUVER BC V6B 2W2',
+            issuingAuthority: 'ICBC / Driver Licensing'
+          }
+        },
         verifications: {
           ...d.verifications,
           id: { status: 'PASSED', score: 99.4, details: 'Driver License OCR matched. Amazon Rekognition CompareFaces score: 99.4%.' }
@@ -215,7 +248,7 @@ export default function App() {
     <div className={`min-h-screen ${theme.bg} font-sans transition-colors duration-200 pb-20`}>
       <div className="flex h-screen overflow-hidden">
         
-        {/* Desktop Navigation Sidebar */}
+        {/* Desktop Sidebar */}
         <aside className={`hidden md:flex w-52 ${theme.sidebar} border-r flex-col justify-between shrink-0`}>
           <div>
             <div className={`p-4 border-b ${theme.border} flex items-center gap-2`}>
@@ -259,7 +292,7 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Main Content Area */}
+        {/* Main Workspace */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className={`h-14 border-b ${theme.header} px-4 flex items-center justify-between shrink-0`}>
             <div className="flex items-center gap-2">
@@ -295,7 +328,7 @@ export default function App() {
                       onClick={() => setActiveVerifyDeal(null)}
                       className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold"
                     >
-                      Exit Portal
+                      Exit
                     </button>
                   </div>
 
@@ -355,7 +388,7 @@ export default function App() {
                             licenseUploaded ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-slate-800 bg-slate-900/60 text-slate-300'
                           }`}
                         >
-                          <span>{licenseUploaded ? 'Driver License Uploaded' : 'Upload Driver License'}</span>
+                          <span>{licenseUploaded ? "Driver's License Uploaded" : "Upload Driver's License"}</span>
                           {licenseUploaded ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Plus className="w-4 h-4" />}
                         </button>
 
@@ -466,7 +499,7 @@ export default function App() {
                           onClick={() => setInspectingDeal(deal)}
                           className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-semibold flex items-center gap-1"
                         >
-                          <Eye className="w-3 h-3 text-blue-400" /> View Audit
+                          <Eye className="w-3 h-3 text-blue-400" /> Audit File
                         </button>
 
                         <button
@@ -517,7 +550,6 @@ export default function App() {
           <span>Home</span>
         </button>
 
-        {/* Elevated Center Add Button */}
         <button
           onClick={() => setIsAddDealOpen(true)}
           className="w-12 h-12 -mt-7 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/50 border-4 border-[#0B0F17] hover:bg-blue-500 transition-all"
@@ -536,13 +568,13 @@ export default function App() {
         </button>
       </nav>
 
-      {/* INSPECT DEAL VERIFICATION AUDIT MODAL */}
+      {/* AUDIT FILE REVIEW DRAWER / MODAL */}
       {inspectingDeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className={`${theme.card} border rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl`}>
             <div className="flex justify-between items-center border-b pb-3 border-slate-800">
               <div>
-                <span className="text-[10px] font-bold text-blue-500 font-mono">VERIFICATION AUDIT FILE</span>
+                <span className="text-[10px] font-bold text-blue-500 font-mono">FULL VERIFICATION AUDIT FILE</span>
                 <h3 className="text-sm font-bold text-white">{inspectingDeal.client.name} ({inspectingDeal.id})</h3>
               </div>
               <button onClick={() => setInspectingDeal(null)} className="p-1 text-slate-400 hover:text-white">
@@ -550,40 +582,102 @@ export default function App() {
               </button>
             </div>
 
+            {/* 1. DOCUMENT IDENTIFICATION & OCR TEXT */}
             <div className={`p-3.5 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2`}>
               <div className="flex items-center justify-between border-b pb-2 border-slate-800">
                 <div className="flex items-center gap-2">
-                  <Landmark className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-white">Employer & Income Deposits</span>
+                  <CreditCard className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs font-bold text-white">Government ID Details</span>
                 </div>
-                <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold">
-                  {inspectingDeal.verifications.income.status}
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                  inspectingDeal.verifications.id.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                }`}>
+                  {inspectingDeal.verifications.id.status === 'PASSED' ? 'PASSED MATCH' : 'PENDING'}
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
-                <div>
-                  <span className="text-slate-500 block text-[9px]">Verified Employer</span>
-                  <span className="font-semibold text-slate-200">{inspectingDeal.employerDetails?.name || 'Acme Corp'}</span>
+              <div className="space-y-1.5 text-[11px] pt-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ID Type Used:</span>
+                  <span className="font-semibold text-blue-400">{inspectingDeal.idDetails?.type || "Driver's License"}</span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[9px]">Monthly Net Deposits</span>
-                  <span className="font-bold text-emerald-400">${inspectingDeal.employerDetails?.monthlyNetDeposit?.toLocaleString() || '8,450'} / mo</span>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Document No:</span>
+                  <span className="font-mono text-slate-200">{inspectingDeal.idDetails?.documentNumber || 'D8920-10924'}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-800/60 pb-2">
+                  <span className="text-slate-500">Expiration Date:</span>
+                  <span className="text-slate-300">{inspectingDeal.idDetails?.expiryDate || '2029-11-14'}</span>
+                </div>
+
+                <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-1 text-[10px]">
+                  <span className="text-blue-400 font-mono font-bold block mb-1">OCR EXTRACTED CARD DATA:</span>
+                  <div className="text-slate-300"><span className="text-slate-500">Name:</span> {inspectingDeal.idDetails?.extractedText?.fullName || inspectingDeal.client.name.toUpperCase()}</div>
+                  <div className="text-slate-300"><span className="text-slate-500">DOB:</span> {inspectingDeal.idDetails?.extractedText?.dob || '1992-04-18'}</div>
+                  <div className="text-slate-300"><span className="text-slate-500">Address:</span> {inspectingDeal.idDetails?.extractedText?.address || '1428 BAYVIEW AVE, TORONTO ON'}</div>
+                  <div className="text-slate-300"><span className="text-slate-500">Issuer:</span> {inspectingDeal.idDetails?.extractedText?.issuingAuthority || 'Ministry of Transportation'}</div>
                 </div>
               </div>
             </div>
 
+            {/* 2. BIOMETRIC SELFIE VS ID PHOTO */}
             <div className={`p-3.5 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2`}>
               <div className="flex items-center justify-between border-b pb-2 border-slate-800">
                 <div className="flex items-center gap-2">
                   <Camera className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-bold text-white">Biometric ID & Selfie Verification</span>
+                  <span className="text-xs font-bold text-white">Biometric Facial Liveness</span>
                 </div>
                 <span className="text-[10px] font-mono bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-bold">
-                  Match: {inspectingDeal.verifications.id.score}%
+                  {inspectingDeal.verifications.id.score}% MATCH
                 </span>
               </div>
+
+              <div className="grid grid-cols-2 gap-2 text-center pt-1">
+                <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex flex-col items-center">
+                  <div className="w-16 h-12 bg-slate-800 rounded border border-slate-700 flex items-center justify-center mb-1 text-[9px] text-slate-300 font-mono">
+                    ID PHOTO
+                  </div>
+                  <span className="text-[9px] text-slate-400">Scanned ID Photo</span>
+                </div>
+                <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full bg-purple-950/60 border-2 border-purple-500 flex items-center justify-center mb-1 text-[9px] text-purple-300 font-mono">
+                    3D SELFIE
+                  </div>
+                  <span className="text-[9px] text-slate-400">Live Facial Scan</span>
+                </div>
+              </div>
               <p className="text-[10px] text-slate-400 pt-1">{inspectingDeal.verifications.id.details}</p>
+            </div>
+
+            {/* 3. SIGNATURE COMPARISON & VERIFICATION */}
+            <div className={`p-3.5 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2`}>
+              <div className="flex items-center justify-between border-b pb-2 border-slate-800">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-bold text-white">Signature Verification</span>
+                </div>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                  inspectingDeal.verifications.signature.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                }`}>
+                  {inspectingDeal.verifications.signature.status === 'PASSED' ? `MATCHED (${inspectingDeal.verifications.signature.score}%)` : 'PENDING'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-center pt-1">
+                <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="h-8 flex items-center justify-center text-blue-400 font-serif italic text-xs">
+                    S. Jenkins
+                  </div>
+                  <span className="text-[9px] text-slate-400 block border-t border-slate-800 pt-1">ID Physical Signature</span>
+                </div>
+                <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                  <div className="h-8 flex items-center justify-center text-emerald-400 font-serif italic text-xs">
+                    S. Jenkins
+                  </div>
+                  <span className="text-[9px] text-slate-400 block border-t border-slate-800 pt-1">Canvas Drawn PKI</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 pt-1">{inspectingDeal.verifications.signature.details}</p>
             </div>
 
             <button
