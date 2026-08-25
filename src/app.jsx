@@ -51,10 +51,24 @@ export default function App() {
     clientName: '', email: '', ssn: '', vehicle: '', dealership: 'Metro Ford Sales', financeAmount: '', statedIncome: ''
   });
 
-  // Fetch deals & resolve path/query verification parameters
+  // Check URL hash/params on load and window hash changes
   useEffect(() => {
     fetchDeals();
+    window.addEventListener('hashchange', handleHashRouting);
+    return () => window.removeEventListener('hashchange', handleHashRouting);
   }, []);
+
+  const handleHashRouting = () => {
+    const hash = window.location.hash; // e.g. #/verify/DEAL-ID
+    if (hash.includes('verify')) {
+      const parts = hash.split('/');
+      const targetId = parts[parts.length - 1];
+      if (targetId && deals.length > 0) {
+        const found = deals.find(d => d.id === targetId || d.id.slice(0, 8) === targetId);
+        if (found) setActiveVerifyDeal(found);
+      }
+    }
+  };
 
   const fetchDeals = async () => {
     setIsLoading(true);
@@ -62,21 +76,26 @@ export default function App() {
     if (!error && data) {
       setDeals(data);
 
-      // Extract deal ID from path /verify/DEAL-ID or ?verify=DEAL-ID
+      // Check hash route (/#/verify/ID), path route (/verify/ID), or query parameter (?verify=ID)
+      const hash = window.location.hash;
       const pathParts = window.location.pathname.split('/');
-      const pathId = pathParts.includes('verify') ? pathParts[pathParts.indexOf('verify') + 1] : null;
       const queryId = new URLSearchParams(window.location.search).get('verify');
-      const targetId = pathId || queryId;
+      
+      let targetId = queryId;
+      if (hash.includes('verify')) {
+        targetId = hash.split('/').pop();
+      } else if (pathParts.includes('verify')) {
+        targetId = pathParts[pathParts.indexOf('verify') + 1];
+      }
 
       if (targetId) {
         const targetDeal = data.find(d => d.id === targetId || d.id.slice(0, 8) === targetId);
         if (targetDeal) {
           setActiveVerifyDeal(targetDeal);
         } else {
-          // Dynamic fallback for newly generated URL targets
           setActiveVerifyDeal({
             id: targetId,
-            client_name: 'Customer Verification Portal',
+            client_name: 'Borrower Verification Portal',
             vehicle: 'Vehicle Loan Application',
             finance_amount: 35000,
             stated_income: 5000,
@@ -113,7 +132,6 @@ export default function App() {
     });
   }, [deals, searchQuery, selectedDealership]);
 
-  // Create new unique deal in Supabase
   const handleCreateDeal = async (e) => {
     e.preventDefault();
     const newDealPayload = {
@@ -159,7 +177,8 @@ export default function App() {
   };
 
   const copyVerificationLink = (dealId) => {
-    const link = `https://autoverify-pro.vercel.app/verify/${dealId}`;
+    // Generate fail-safe Hash URL to prevent Vercel 404s
+    const link = `https://autoverify-pro.vercel.app/#/verify/${dealId}`;
     navigator.clipboard?.writeText(link);
     setCopiedLink(dealId);
     setTimeout(() => setCopiedLink(null), 2000);
@@ -283,7 +302,7 @@ export default function App() {
     setTimeout(() => {
       setActiveVerifyDeal(null);
       setVerificationStep(1);
-      window.history.pushState({}, document.title, '/');
+      window.location.hash = '';
       fetchDeals();
     }, 1200);
   };
@@ -344,7 +363,7 @@ export default function App() {
 
             <nav className="p-2 space-y-1">
               <button
-                onClick={() => { setActiveTab('DASHBOARD'); setActiveVerifyDeal(null); window.history.pushState({}, document.title, '/'); }}
+                onClick={() => { setActiveTab('DASHBOARD'); setActiveVerifyDeal(null); window.location.hash = ''; }}
                 className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold ${
                   activeTab === 'DASHBOARD' ? 'bg-blue-600 text-white' : `${theme.textMuted}`
                 }`}
@@ -352,7 +371,7 @@ export default function App() {
                 <Car className="w-4 h-4" /> Pipeline
               </button>
               <button
-                onClick={() => { setActiveTab('DEALERSHIPS'); setActiveVerifyDeal(null); window.history.pushState({}, document.title, '/'); }}
+                onClick={() => { setActiveTab('DEALERSHIPS'); setActiveVerifyDeal(null); window.location.hash = ''; }}
                 className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold ${
                   activeTab === 'DEALERSHIPS' ? 'bg-blue-600 text-white' : `${theme.textMuted}`
                 }`}
@@ -406,7 +425,7 @@ export default function App() {
                       <p className={`text-[11px] ${theme.textMuted}`}>{activeVerifyDeal.vehicle} • ${activeVerifyDeal.finance_amount?.toLocaleString()}</p>
                     </div>
                     <button
-                      onClick={() => { setActiveVerifyDeal(null); window.history.pushState({}, document.title, '/'); }}
+                      onClick={() => { setActiveVerifyDeal(null); window.location.hash = ''; }}
                       className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold"
                     >
                       Exit
@@ -637,7 +656,7 @@ export default function App() {
       {/* FLOATING MOBILE NAVIGATION BAR */}
       <nav className="fixed bottom-0 left-0 right-0 bg-[#0F1623]/95 backdrop-blur-md border-t border-slate-800 px-8 py-2.5 flex items-center justify-between z-50 max-w-md mx-auto rounded-t-2xl md:hidden print:hidden">
         <button
-          onClick={() => { setActiveTab('DASHBOARD'); setActiveVerifyDeal(null); window.history.pushState({}, document.title, '/'); }}
+          onClick={() => { setActiveTab('DASHBOARD'); setActiveVerifyDeal(null); window.location.hash = ''; }}
           className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-colors ${
             activeTab === 'DASHBOARD' && !activeVerifyDeal ? 'text-blue-500 font-bold' : 'text-slate-400'
           }`}
@@ -654,7 +673,7 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => { setActiveTab('DEALERSHIPS'); setActiveVerifyDeal(null); window.history.pushState({}, document.title, '/'); }}
+          onClick={() => { setActiveTab('DEALERSHIPS'); setActiveVerifyDeal(null); window.location.hash = ''; }}
           className={`flex flex-col items-center gap-1 text-[10px] font-medium transition-colors ${
             activeTab === 'DEALERSHIPS' ? 'text-blue-500 font-bold' : 'text-slate-400'
           }`}
