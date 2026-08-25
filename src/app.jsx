@@ -1,9 +1,9 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-  ShieldCheck, ShieldAlert, Lock, Unlock, FileText, CheckCircle2,
-  XCircle, Search, Eye, DollarSign, Car, Building, Fingerprint,
-  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User, Paperclip, ExternalLink, RefreshCw
+  ShieldCheck, Lock, Unlock, FileText, CheckCircle2, Search, Eye, Car, Building,
+  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home,
+  ChevronRight, CreditCard, Printer, User, Paperclip, ExternalLink, Shield
 } from 'lucide-react';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ihkfvwfqftpbgrbzzkto.supabase.co';
@@ -27,22 +27,23 @@ export default function App() {
   const [isAddDealOpen, setIsAddDealOpen] = useState(false);
   const [activeVerifyDeal, setActiveVerifyDeal] = useState(null);
   const [inspectingDeal, setInspectingDeal] = useState(null);
-  const [verificationStep, setVerificationStep] = useState(1);
+  const [wizardStep, setWizardStep] = useState(1); // 1 = Income, 2 = ID Photo, 3 = Selfie, 4 = Signature
   const [copiedLink, setCopiedLink] = useState(null);
 
   // Step 1: Upload Documents State
   const [uploadedDocs, setUploadedDocs] = useState([]);
   const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
 
-  // Step 2: ID & Selfie Wizard State
-  const [idSubStep, setIdSubStep] = useState(1); // 1 = ID Front, 2 = Selfie
+  // Step 2 & 3: Camera Capture Inputs & Previews
+  const idInputRef = useRef(null);
+  const selfieInputRef = useRef(null);
   const [idFrontFile, setIdFrontFile] = useState(null);
   const [idFrontPreview, setIdFrontPreview] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfiePreview, setSelfiePreview] = useState(null);
   const [isAnalyzingBiometrics, setIsAnalyzingBiometrics] = useState(false);
 
-  // Step 3: Signature State
+  // Step 4: Signature State
   const [isSigned, setIsSigned] = useState(false);
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -132,28 +133,11 @@ export default function App() {
       finance_amount: Number(newDealForm.financeAmount) || 55888,
       stated_income: Number(newDealForm.statedIncome) || 6000,
       status: 'PENDING_VERIFICATION',
-      employer_details: {
-        name: 'Awaiting Upload',
-        monthlyNetDeposit: 0,
-        payFrequency: 'Pending Upload',
-        confidence: 'Pending'
-      },
+      employer_details: { name: 'Awaiting Upload', monthlyNetDeposit: 0, payFrequency: 'Pending Upload', confidence: 'Pending' },
       attached_documents: [],
-      id_details: {
-        type: "Canadian Driver's License (Pending Scan)",
-        documentNumber: 'PENDING-OCR',
-        expiryDate: 'N/A',
-        extractedText: {
-          fullName: newDealForm.clientName.toUpperCase(),
-          dob: 'Pending Verification',
-          address: 'Pending OCR Scan',
-          issuingAuthority: 'Provincial Ministry'
-        }
-      },
+      id_details: { type: "Canadian Driver's License (Pending Scan)", documentNumber: 'PENDING-OCR', expiryDate: 'N/A' },
       verifications: {
-        income: { status: 'PENDING', details: 'Requires 2 paystubs or 3 months bank statements.' },
-        id: { status: 'PENDING', score: 0, details: "Awaiting Canadian Driver's License & Selfie Scan." },
-        signature: { status: 'PENDING', score: 0, details: 'Awaiting PKI Digital Signature.' }
+        income: { status: 'PENDING' }, id: { status: 'PENDING', score: 0 }, signature: { status: 'PENDING', score: 0 }
       }
     };
 
@@ -216,12 +200,11 @@ export default function App() {
       }).eq('id', activeVerifyDeal.id);
 
       setActiveVerifyDeal(prev => ({ ...prev, attached_documents: uploadedDocs, employer_details: updatedEmployer, verifications: updatedVerifications }));
-      setVerificationStep(2);
+      setWizardStep(2);
       fetchDeals();
-    }, 2000);
+    }, 1800);
   };
 
-  // STEP 2 CAMERA CAPTURE HANDLERS
   const handleIdCapture = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -263,7 +246,7 @@ export default function App() {
       }).eq('id', activeVerifyDeal.id);
 
       setActiveVerifyDeal(prev => ({ ...prev, id_details: updatedIdDetails, verifications: updatedVerifications }));
-      setVerificationStep(3);
+      setWizardStep(4);
       fetchDeals();
     }, 1800);
   };
@@ -308,7 +291,7 @@ export default function App() {
 
     setTimeout(() => {
       setActiveVerifyDeal(null);
-      setVerificationStep(1);
+      setWizardStep(1);
       window.location.hash = '';
       fetchDeals();
     }, 1200);
@@ -352,6 +335,10 @@ export default function App() {
           .print\\:page-fit { max-height: 100vh; page-break-inside: avoid; }
         }
       `}</style>
+
+      {/* HIDDEN CAMERA INPUTS */}
+      <input ref={idInputRef} type="file" accept="image/*" capture="environment" onChange={handleIdCapture} className="hidden" />
+      <input ref={selfieInputRef} type="file" accept="image/*" capture="user" onChange={handleSelfieCapture} className="hidden" />
 
       <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible">
         
@@ -422,59 +409,69 @@ export default function App() {
 
           <main className="flex-1 overflow-y-auto p-4 space-y-4 print:p-0 print:overflow-visible">
             
+            {/* WOOV-STYLE STEP-BY-STEP VERIFICATION WIZARD */}
             {activeVerifyDeal ? (
-              <div className="max-w-xl mx-auto space-y-4">
-                <div className={`p-5 rounded-2xl border ${theme.card} space-y-4 shadow-xl`}>
+              <div className="max-w-md mx-auto space-y-4">
+                <div className={`p-6 rounded-3xl border ${theme.card} space-y-5 shadow-2xl bg-gradient-to-b from-[#0F1623] to-[#0B0F17]`}>
+                  
+                  {/* HEADER */}
                   <div className="flex justify-between items-center border-b pb-3 border-slate-800">
-                    <div>
-                      <span className="text-[10px] font-bold text-blue-500 font-mono">VERIFICATION PORTAL</span>
-                      <h3 className="text-sm font-bold text-white">{activeVerifyDeal.client_name}</h3>
-                      <p className={`text-[11px] ${theme.textMuted}`}>{activeVerifyDeal.vehicle} • ${activeVerifyDeal.finance_amount?.toLocaleString()}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+                        <Shield className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">{activeVerifyDeal.client_name}</h3>
+                        <p className="text-[10px] text-slate-400">{activeVerifyDeal.vehicle} • ${activeVerifyDeal.finance_amount?.toLocaleString()}</p>
+                      </div>
                     </div>
                     <button
                       onClick={() => { setActiveVerifyDeal(null); window.location.hash = ''; }}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold"
+                      className="p-1.5 rounded-full bg-slate-800 text-slate-400 hover:text-white"
                     >
-                      Exit
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <div className={`h-1.5 rounded-full ${verificationStep >= 1 ? 'bg-blue-500' : 'bg-slate-800'}`} />
-                    <div className={`h-1.5 rounded-full ${verificationStep >= 2 ? 'bg-blue-500' : 'bg-slate-800'}`} />
-                    <div className={`h-1.5 rounded-full ${verificationStep >= 3 ? 'bg-blue-500' : 'bg-slate-800'}`} />
+                  {/* STEP INDICATOR DOTS */}
+                  <div className="flex items-center justify-between px-2">
+                    {[1, 2, 3, 4].map(s => (
+                      <div key={s} className="flex items-center gap-1.5">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-mono transition-all ${
+                          wizardStep === s ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/50 ring-2 ring-blue-400' :
+                          wizardStep > s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-900 text-slate-500 border border-slate-800'
+                        }`}>
+                          {wizardStep > s ? <Check className="w-3.5 h-3.5" /> : s}
+                        </div>
+                        {s < 4 && <div className={`w-8 h-0.5 rounded-full ${wizardStep > s ? 'bg-emerald-500' : 'bg-slate-800'}`} />}
+                      </div>
+                    ))}
                   </div>
 
-                  {/* STEP 1: MULTI-STATEMENT / PAYSTUB UPLOADER */}
-                  {verificationStep === 1 && (
-                    <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-4`}>
-                      <div className="flex items-center gap-2">
-                        <Landmark className="w-5 h-5 text-blue-500" />
-                        <div>
-                          <h4 className="text-xs font-bold text-white">Step 1: Upload Bank Statements / Paystubs</h4>
-                          <p className="text-[10px] text-blue-400 font-medium">Requires 2 recent paystubs OR 3 months bank statements</p>
-                        </div>
+                  {/* WIZARD STEP 1: INCOME VERIFICATION */}
+                  {wizardStep === 1 && (
+                    <div className="space-y-4">
+                      <div className="text-center space-y-1">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Step 1: Income Verification</h4>
+                        <p className="text-[10px] text-slate-400">Upload 2 recent paystubs or 3 months bank e-statements</p>
                       </div>
 
-                      <form onSubmit={handlePdfUploadSubmit} className="space-y-3 text-xs">
-                        <label className={`border-2 border-dashed ${theme.border} rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors`}>
-                          <Upload className="w-7 h-7 text-blue-500 mb-1" />
-                          <span className="text-xs text-slate-300 font-semibold text-center">
-                            {uploadedDocs.length > 0 ? `${uploadedDocs.length} Financial Statements Selected` : 'Tap to upload RBC Statement or Paystubs'}
+                      <form onSubmit={handlePdfUploadSubmit} className="space-y-3">
+                        <label className="border-2 border-dashed border-blue-500/30 hover:border-blue-500 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-900/40 transition-colors">
+                          <Upload className="w-8 h-8 text-blue-400 mb-2" />
+                          <span className="text-xs font-bold text-slate-200 text-center">
+                            {uploadedDocs.length > 0 ? `${uploadedDocs.length} Documents Selected` : 'Tap to Select Bank PDF Statements'}
                           </span>
-                          <span className="text-[10px] text-slate-500 mt-1 text-center">Parses DealerCanada Auto Inc. payroll & direct deposits automatically</span>
+                          <span className="text-[9px] text-slate-500 mt-1">Parses RBC, TD, BMO, CIBC, ADP direct deposits</span>
                           <input type="file" multiple accept="application/pdf,image/*" onChange={handleDocumentSelection} className="hidden" />
                         </label>
 
                         {uploadedDocs.length > 0 && (
-                          <div className="space-y-1 bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                            <span className="text-[10px] text-slate-400 font-bold block mb-1">Files Ready for AWS Textract ({uploadedDocs.length}):</span>
+                          <div className="space-y-1 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                             {uploadedDocs.map((doc, i) => (
-                              <div key={i} className="flex justify-between items-center text-[10px] text-slate-300 bg-slate-950 p-1.5 rounded border border-slate-800/80">
-                                <span className="flex items-center gap-1.5 truncate">
-                                  <Paperclip className="w-3 h-3 text-blue-400 shrink-0" /> {doc.name}
-                                </span>
-                                <span className="text-[9px] text-blue-400 font-mono shrink-0">{doc.size}</span>
+                              <div key={i} className="flex justify-between items-center text-[10px] text-slate-300">
+                                <span className="flex items-center gap-1.5 truncate"><Paperclip className="w-3 h-3 text-blue-400" /> {doc.name}</span>
+                                <span className="text-[9px] text-blue-400 font-mono">{doc.size}</span>
                               </div>
                             ))}
                           </div>
@@ -483,144 +480,135 @@ export default function App() {
                         <button
                           type="submit"
                           disabled={uploadedDocs.length === 0 || isAnalyzingPdf}
-                          className={`w-full py-2.5 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2 shadow ${
-                            uploadedDocs.length > 0 ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          className={`w-full py-3 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                            uploadedDocs.length > 0 ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                           }`}
                         >
-                          {isAnalyzingPdf ? 'Parsing Deposits & Employer via AWS Textract...' : 'Verify Employer & Income Stream'}
+                          {isAnalyzingPdf ? 'Parsing via AWS Textract...' : 'Verify Income & Continue'}
                         </button>
                       </form>
                     </div>
                   )}
 
-                  {/* STEP 2: ID & SELFIE CAMERA CAPTURE WIZARD */}
-                  {verificationStep === 2 && (
-                    <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-4`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Camera className="w-5 h-5 text-purple-500" />
-                          <div>
-                            <h4 className="text-xs font-bold text-white">Step 2: Canadian ID & Selfie Camera</h4>
-                            <p className="text-[10px] text-purple-400 font-medium">{idSubStep === 1 ? 'Step 2A: Photo of Canadian Driver ID' : 'Step 2B: Live Biometric Selfie'}</p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-bold">
-                          Step {idSubStep} / 2
-                        </span>
+                  {/* WIZARD STEP 2: DRIVER LICENSE SCAN */}
+                  {wizardStep === 2 && (
+                    <div className="space-y-4">
+                      <div className="text-center space-y-1">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Step 2: Canadian Driver's License</h4>
+                        <p className="text-[10px] text-slate-400">Open camera and scan front of provincial driver's license</p>
                       </div>
 
-                      {idSubStep === 1 ? (
-                        <div className="space-y-3 text-xs">
-                          <label className="border-2 border-dashed border-purple-500/40 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 bg-slate-900/60 transition-colors">
-                            {idFrontPreview ? (
-                              <img src={idFrontPreview} alt="ID Preview" className="w-full h-32 object-cover rounded-lg border border-purple-500/50 mb-2" />
-                            ) : (
-                              <CreditCard className="w-8 h-8 text-purple-400 mb-1" />
-                            )}
-                            <span className="text-xs text-slate-200 font-bold text-center">
-                              {idFrontFile ? 'Driver License Captured! Tap to Retake' : "Tap to Open Camera for Driver's License"}
-                            </span>
-                            <span className="text-[10px] text-slate-400 mt-0.5">Triggers phone camera to scan license front</span>
-                            
-                            {/* REAR CAMERA TRIGGER INPUT */}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={handleIdCapture}
-                              className="hidden"
-                            />
-                          </label>
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => idInputRef.current?.click()}
+                          className={`w-full border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                            idFrontFile ? 'border-emerald-500/50 bg-emerald-500/10' : 'border-purple-500/30 hover:border-purple-500 bg-slate-900/40'
+                          }`}
+                        >
+                          {idFrontPreview ? (
+                            <img src={idFrontPreview} alt="ID Front" className="w-full h-32 object-cover rounded-xl border border-purple-500 mb-2" />
+                          ) : (
+                            <CreditCard className="w-8 h-8 text-purple-400 mb-2" />
+                          )}
+                          <span className="text-xs font-bold text-slate-200">
+                            {idFrontFile ? 'ID Captured! Tap to Retake' : "Tap to Open Rear Camera for ID"}
+                          </span>
+                          <span className="text-[9px] text-slate-500 mt-0.5">Extracts legal name, DL number & expiry</span>
+                        </button>
 
-                          <button
-                            type="button"
-                            disabled={!idFrontFile}
-                            onClick={() => setIdSubStep(2)}
-                            className={`w-full py-2.5 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-1 shadow ${
-                              idFrontFile ? 'bg-purple-600 hover:bg-purple-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            }`}
-                          >
-                            Next: Take Live Selfie <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-3 text-xs">
-                          <label className="border-2 border-dashed border-purple-500/40 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 bg-purple-950/20 text-center transition-colors">
-                            {selfiePreview ? (
-                              <img src={selfiePreview} alt="Selfie Preview" className="w-24 h-24 rounded-full object-cover border-2 border-purple-400 mb-2 shadow-lg" />
-                            ) : (
-                              <div className="w-16 h-16 rounded-full bg-purple-900/40 border-2 border-purple-400 flex items-center justify-center mb-1">
-                                <UserCheck className="w-8 h-8 text-purple-300" />
-                              </div>
-                            )}
-                            <span className="text-xs text-slate-200 font-bold">
-                              {selfieFile ? 'Selfie Captured! Tap to Retake' : 'Tap to Open Front Selfie Camera'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 mt-0.5">Triggers front selfie camera for liveness match</span>
-                            
-                            {/* FRONT SELFIE CAMERA TRIGGER INPUT */}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="user"
-                              onChange={handleSelfieCapture}
-                              className="hidden"
-                            />
-                          </label>
-
-                          <div className="flex gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => setIdSubStep(1)}
-                              className="px-3 py-2 rounded-lg bg-slate-800 text-slate-300 font-semibold text-xs"
-                            >
-                              Back
-                            </button>
-                            <button
-                              onClick={handleBiometricVerification}
-                              disabled={!selfieFile || isAnalyzingBiometrics}
-                              className={`flex-1 py-2.5 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2 shadow ${
-                                selfieFile ? 'bg-purple-600 hover:bg-purple-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                              }`}
-                            >
-                              {isAnalyzingBiometrics ? 'AWS Rekognition Comparing Faces...' : 'Verify ID & Facial Liveness'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                        <button
+                          type="button"
+                          disabled={!idFrontFile}
+                          onClick={() => setWizardStep(3)}
+                          className={`w-full py-3 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-1 shadow-lg transition-all ${
+                            idFrontFile ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/30' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Next: Take Live Selfie <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
-                  {/* STEP 3: DIGITAL SIGNATURE */}
-                  {verificationStep === 3 && (
-                    <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-4`}>
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-indigo-500" />
-                        <div>
-                          <h4 className="text-xs font-bold text-white">Step 3: Signature Comparison & PKI Signing</h4>
-                          <p className="text-[10px] text-indigo-400 font-medium">Verifies vector geometry against Canadian Driver's License signature</p>
-                        </div>
+                  {/* WIZARD STEP 3: LIVE SELFIE SCAN */}
+                  {wizardStep === 3 && (
+                    <div className="space-y-4">
+                      <div className="text-center space-y-1">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Step 3: Biometric Liveness Selfie</h4>
+                        <p className="text-[10px] text-slate-400">Open front selfie camera for facial match against ID</p>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="block text-slate-400 text-[10px]">Sign with your finger inside the box below:</label>
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => selfieInputRef.current?.click()}
+                          className={`w-full border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${
+                            selfieFile ? 'border-emerald-500/50 bg-emerald-500/10' : 'border-purple-500/30 hover:border-purple-500 bg-purple-950/20'
+                          }`}
+                        >
+                          {selfiePreview ? (
+                            <img src={selfiePreview} alt="Selfie" className="w-24 h-24 rounded-full object-cover border-2 border-purple-400 mb-2 shadow-xl" />
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-purple-900/40 border-2 border-purple-400 flex items-center justify-center mb-2">
+                              <UserCheck className="w-8 h-8 text-purple-300" />
+                            </div>
+                          )}
+                          <span className="text-xs font-bold text-slate-200">
+                            {selfieFile ? 'Selfie Captured! Tap to Retake' : 'Tap to Open Front Camera for Selfie'}
+                          </span>
+                          <span className="text-[9px] text-slate-500 mt-0.5">Executes AWS Rekognition CompareFaces</span>
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setWizardStep(2)}
+                            className="px-4 py-3 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs"
+                          >
+                            Back
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!selfieFile || isAnalyzingBiometrics}
+                            onClick={handleBiometricVerification}
+                            className={`flex-1 py-3 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                              selfieFile ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-600/30' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            }`}
+                          >
+                            {isAnalyzingBiometrics ? 'Matching Faces via AWS...' : 'Verify Biometrics & Continue'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WIZARD STEP 4: SIGNATURE MATCH */}
+                  {wizardStep === 4 && (
+                    <div className="space-y-4">
+                      <div className="text-center space-y-1">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider">Step 4: Draw Digital Signature</h4>
+                        <p className="text-[10px] text-slate-400">Draw signature below to match Driver's License signature image</p>
+                      </div>
+
+                      <div className="space-y-2">
                         <canvas
                           ref={canvasRef} width={320} height={120}
                           onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => setIsDrawing(false)}
                           onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => setIsDrawing(false)}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg touch-none cursor-crosshair"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl touch-none cursor-crosshair"
                         />
-                      </div>
 
-                      <button
-                        onClick={handleCompleteSignature}
-                        disabled={!isSigned}
-                        className={`w-full py-2.5 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2 shadow ${
-                          isSigned ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                        }`}
-                      >
-                        <Unlock className="w-3.5 h-3.5" /> Execute Signature Match
-                      </button>
+                        <button
+                          onClick={handleCompleteSignature}
+                          disabled={!isSigned}
+                          className={`w-full py-3 rounded-xl text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                            isSigned ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}
+                        >
+                          <Unlock className="w-4 h-4" /> Submit & Complete Verification
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -691,7 +679,7 @@ export default function App() {
                           </button>
 
                           <button
-                            onClick={() => { setActiveVerifyDeal(deal); setVerificationStep(1); }}
+                            onClick={() => { setActiveVerifyDeal(deal); setWizardStep(1); }}
                             className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1 shadow"
                           >
                             Portal <ArrowRight className="w-3 h-3" />
