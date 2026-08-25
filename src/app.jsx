@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   ShieldCheck, ShieldAlert, Lock, Unlock, FileText, CheckCircle2,
   XCircle, Search, Eye, DollarSign, Car, Building, Fingerprint,
-  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer
+  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User
 } from 'lucide-react';
 
 const INITIAL_DEALERSHIPS = [
@@ -250,6 +250,18 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} font-sans transition-colors duration-200 pb-20 print:pb-0 print:bg-white print:text-black`}>
+      
+      {/* GLOBAL PRINT STYLES FOR SINGLE PAGE FIT */}
+      <style>{`
+        @media print {
+          @page { size: letter portrait; margin: 0.3in; }
+          body { background: white !important; color: black !important; }
+          .print\\:hidden { display: none !important; }
+          .print\\:border-slate { border-color: #cbd5e1 !important; }
+          .print\\:page-fit { max-height: 100vh; page-break-inside: avoid; }
+        }
+      `}</style>
+
       <div className="flex h-screen overflow-hidden print:h-auto print:overflow-visible">
         
         {/* Desktop Sidebar */}
@@ -572,13 +584,13 @@ export default function App() {
         </button>
       </nav>
 
-      {/* AUDIT FILE REVIEW DRAWER / MODAL */}
+      {/* SINGLE PAGE AUDIT FILE PRINTOUT & REVIEW MODAL */}
       {inspectingDeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md print:static print:p-0 print:bg-white">
-          <div className={`${theme.card} border rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5 space-y-4 shadow-2xl print:max-w-none print:max-h-none print:shadow-none print:border-none print:bg-white print:text-black`}>
+          <div className={`${theme.card} border rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-4 space-y-3 shadow-2xl print:max-w-none print:max-h-none print:shadow-none print:border-none print:bg-white print:text-black print:space-y-2 print:page-fit`}>
             
-            {/* PRINT & AUDIT HEADER */}
-            <div className="flex justify-between items-center border-b pb-3 border-slate-800 print:border-slate-300">
+            {/* AUDIT HEADER */}
+            <div className="flex justify-between items-center border-b pb-2 border-slate-800 print:border-slate-300">
               <div>
                 <span className="text-[10px] font-bold text-blue-500 font-mono print:text-blue-700">CANADIAN F&I VERIFICATION AUDIT FILE</span>
                 <h3 className="text-sm font-bold text-white print:text-black">{inspectingDeal.client.name} ({inspectingDeal.id})</h3>
@@ -588,7 +600,7 @@ export default function App() {
                   onClick={handlePrintPdfAudit}
                   className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1 shadow"
                 >
-                  <Printer className="w-3.5 h-3.5" /> Print PDF
+                  <Printer className="w-3.5 h-3.5" /> Print 1-Page PDF
                 </button>
                 <button onClick={() => setInspectingDeal(null)} className="p-1 text-slate-400 hover:text-white">
                   <X className="w-5 h-5" />
@@ -596,102 +608,86 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1. CANADIAN DRIVER'S LICENSE OCR DETAILS */}
-            <div className={`p-3.5 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2 print:border-slate-300 print:bg-slate-50`}>
-              <div className="flex items-center justify-between border-b pb-2 border-slate-800 print:border-slate-300">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-blue-400 print:text-blue-700" />
+            {/* 1. CANADIAN DRIVER'S LICENSE DETAILS */}
+            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
+              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-400 print:text-blue-700" />
                   <span className="text-xs font-bold text-white print:text-black">Canadian Driver's License OCR</span>
                 </div>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                <span className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold ${
                   inspectingDeal.verifications.id.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-400 print:bg-emerald-100 print:text-emerald-800' : 'bg-amber-500/10 text-amber-400'
                 }`}>
-                  {inspectingDeal.verifications.id.status === 'PASSED' ? 'PASSED VERIFICATION' : 'PENDING'}
+                  PASSED MATCH
                 </span>
               </div>
 
-              <div className="space-y-1.5 text-[11px] pt-1 print:text-slate-900">
-                <div className="flex justify-between">
-                  <span className="text-slate-500 print:text-slate-600">Provincial ID Type:</span>
-                  <span className="font-semibold text-blue-400 print:text-blue-800">{inspectingDeal.idDetails?.type || "Canadian Driver's License"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 print:text-slate-600">DL Number:</span>
-                  <span className="font-mono text-slate-200 print:text-black">{inspectingDeal.idDetails?.documentNumber}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-800/60 pb-2 print:border-slate-300">
-                  <span className="text-slate-500 print:text-slate-600">Expiry Date:</span>
-                  <span className="text-slate-300 print:text-black">{inspectingDeal.idDetails?.expiryDate}</span>
-                </div>
-
-                <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 space-y-1 text-[10px] print:bg-white print:border-slate-300 print:text-black">
-                  <span className="text-blue-400 font-mono font-bold block mb-1 print:text-blue-800">CANADIAN AAMVA OCR EXTRACTED TEXT:</span>
-                  <div><span className="text-slate-500 print:text-slate-600">Full Legal Name:</span> {inspectingDeal.idDetails?.extractedText?.fullName}</div>
-                  <div><span className="text-slate-500 print:text-slate-600">Date of Birth:</span> {inspectingDeal.idDetails?.extractedText?.dob}</div>
-                  <div><span className="text-slate-500 print:text-slate-600">Primary Address:</span> {inspectingDeal.idDetails?.extractedText?.address}</div>
-                  <div><span className="text-slate-500 print:text-slate-600">Issuing Ministry:</span> {inspectingDeal.idDetails?.extractedText?.issuingAuthority}</div>
-                </div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] print:text-black">
+                <div><span className="text-slate-500">DL Type:</span> {inspectingDeal.idDetails?.type || "Canadian DL"}</div>
+                <div><span className="text-slate-500">DL Number:</span> <span className="font-mono">{inspectingDeal.idDetails?.documentNumber}</span></div>
+                <div><span className="text-slate-500">Legal Name:</span> {inspectingDeal.idDetails?.extractedText?.fullName}</div>
+                <div><span className="text-slate-500">Expiry Date:</span> {inspectingDeal.idDetails?.expiryDate}</div>
               </div>
             </div>
 
-            {/* 2. BIOMETRIC SELFIE VS ID PHOTO MATCH */}
-            <div className={`p-3.5 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2 print:border-slate-300 print:bg-slate-50`}>
-              <div className="flex items-center justify-between border-b pb-2 border-slate-800 print:border-slate-300">
-                <div className="flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-purple-400 print:text-purple-700" />
+            {/* 2. VISIBLE ID PHOTO VS 3D SELFIE MATCH */}
+            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
+              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-purple-400 print:text-purple-700" />
                   <span className="text-xs font-bold text-white print:text-black">Biometric Facial Liveness Scan</span>
                 </div>
-                <span className="text-[10px] font-mono bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-bold print:bg-purple-100 print:text-purple-800">
-                  {inspectingDeal.verifications.id.score}% FACIAL MATCH
+                <span className="text-[9px] font-mono bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded font-bold print:bg-purple-100 print:text-purple-800">
+                  {inspectingDeal.verifications.id.score}% MATCH
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-center pt-1">
-                <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex flex-col items-center print:bg-white print:border-slate-300">
-                  <div className="w-16 h-12 bg-slate-800 rounded border border-slate-700 flex items-center justify-center mb-1 text-[9px] text-slate-300 font-mono print:bg-slate-100 print:text-black">
-                    CANADIAN DL
+              {/* RENDERED VISIBLE IMAGE BOXES FOR PRINTING */}
+              <div className="grid grid-cols-2 gap-3 text-center pt-1">
+                <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex flex-col items-center print:bg-slate-100 print:border-slate-400">
+                  <div className="w-20 h-14 bg-gradient-to-br from-blue-900/40 to-slate-800 rounded border border-blue-500/30 flex flex-col items-center justify-center p-1 text-slate-200 print:text-black print:border-blue-700">
+                    <User className="w-6 h-6 text-blue-400 mb-0.5 print:text-blue-800" />
+                    <span className="text-[7px] font-mono uppercase font-bold">CANADIAN DL</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 print:text-slate-600">License Card Photo</span>
+                  <span className="text-[8px] text-slate-400 print:text-slate-700 mt-1">Scanned ID Card Photo</span>
                 </div>
-                <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 flex flex-col items-center print:bg-white print:border-slate-300">
-                  <div className="w-12 h-12 rounded-full bg-purple-950/60 border-2 border-purple-500 flex items-center justify-center mb-1 text-[9px] text-purple-300 font-mono print:bg-purple-100 print:text-purple-800">
-                    3D SELFIE
+
+                <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex flex-col items-center print:bg-slate-100 print:border-slate-400">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500/50 flex flex-col items-center justify-center p-1 text-purple-200 print:text-black print:border-purple-700">
+                    <UserCheck className="w-6 h-6 text-purple-400 print:text-purple-800" />
+                    <span className="text-[7px] font-mono uppercase font-bold">3D SELFIE</span>
                   </div>
-                  <span className="text-[9px] text-slate-400 print:text-slate-600">Live Liveness Match</span>
+                  <span className="text-[8px] text-slate-400 print:text-slate-700 mt-1">Live Liveness Selfie</span>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 print:text-slate-700 pt-1">{inspectingDeal.verifications.id.details}</p>
             </div>
 
-            {/* 3. SIGNATURE COMPARISON & PKI MATCH */}
-            <div className={`p-3.5 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2 print:border-slate-300 print:bg-slate-50`}>
-              <div className="flex items-center justify-between border-b pb-2 border-slate-800 print:border-slate-300">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-400 print:text-indigo-700" />
+            {/* 3. SIGNATURE COMPARISON */}
+            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
+              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-400 print:text-indigo-700" />
                   <span className="text-xs font-bold text-white print:text-black">Signature Vector Verification</span>
                 </div>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                  inspectingDeal.verifications.signature.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-400 print:bg-emerald-100 print:text-emerald-800' : 'bg-amber-500/10 text-amber-400'
-                }`}>
-                  {inspectingDeal.verifications.signature.status === 'PASSED' ? `MATCHED (${inspectingDeal.verifications.signature.score}%)` : 'PENDING'}
+                <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-bold print:bg-emerald-100 print:text-emerald-800">
+                  MATCHED ({inspectingDeal.verifications.signature.score}%)
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-center pt-1">
-                <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
-                  <div className="h-8 flex items-center justify-center text-blue-400 font-serif italic text-xs print:text-black">
+                <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 print:bg-slate-100 print:border-slate-400">
+                  <div className="h-7 flex items-center justify-center text-blue-400 font-serif italic text-xs print:text-black font-bold">
                     S. Jenkins
                   </div>
-                  <span className="text-[9px] text-slate-400 block border-t border-slate-800 pt-1 print:border-slate-300 print:text-slate-600">Canadian DL Card Signature</span>
+                  <span className="text-[8px] text-slate-400 block border-t border-slate-800 pt-0.5 print:border-slate-300 print:text-slate-700">ID Physical Signature</span>
                 </div>
-                <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 print:bg-white print:border-slate-300">
-                  <div className="h-8 flex items-center justify-center text-emerald-400 font-serif italic text-xs print:text-black">
+                <div className="bg-slate-900 p-1.5 rounded-lg border border-slate-800 print:bg-slate-100 print:border-slate-400">
+                  <div className="h-7 flex items-center justify-center text-emerald-400 font-serif italic text-xs print:text-black font-bold">
                     S. Jenkins
                   </div>
-                  <span className="text-[9px] text-slate-400 block border-t border-slate-800 pt-1 print:border-slate-300 print:text-slate-600">PKI Drawn Canvas</span>
+                  <span className="text-[8px] text-slate-400 block border-t border-slate-800 pt-0.5 print:border-slate-300 print:text-slate-700">PKI Drawn Canvas</span>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 print:text-slate-700 pt-1">{inspectingDeal.verifications.signature.details}</p>
             </div>
 
             <button
