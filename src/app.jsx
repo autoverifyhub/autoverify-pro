@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   ShieldCheck, ShieldAlert, Lock, Unlock, FileText, CheckCircle2,
   XCircle, Search, Eye, DollarSign, Car, Building, Fingerprint,
-  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User, Paperclip, ExternalLink, Sparkles
+  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User, Paperclip, ExternalLink, RefreshCw
 } from 'lucide-react';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ihkfvwfqftpbgrbzzkto.supabase.co';
@@ -37,7 +37,9 @@ export default function App() {
   // Step 2: ID & Selfie Wizard State
   const [idSubStep, setIdSubStep] = useState(1); // 1 = ID Front, 2 = Selfie
   const [idFrontFile, setIdFrontFile] = useState(null);
-  const [selfieFile, setSelfieCaptured] = useState(null);
+  const [idFrontPreview, setIdFrontPreview] = useState(null);
+  const [selfieFile, setSelfieFile] = useState(null);
+  const [selfiePreview, setSelfiePreview] = useState(null);
   const [isAnalyzingBiometrics, setIsAnalyzingBiometrics] = useState(false);
 
   // Step 3: Signature State
@@ -182,7 +184,6 @@ export default function App() {
     setUploadedDocs(formattedDocs);
   };
 
-  // STEP 1 PARSER: Dynamically parses statement for DealerCanada Auto Inc.
   const handlePdfUploadSubmit = async (e) => {
     e.preventDefault();
     if (uploadedDocs.length === 0) return;
@@ -190,8 +191,6 @@ export default function App() {
 
     setTimeout(async () => {
       setIsAnalyzingPdf(false);
-      
-      // Parsed from RBC Statement (DEALERCANADA AUTO INC., $6,087.24 deposits)
       const isDealerCanada = uploadedDocs.some(d => d.name.includes('1019611') || d.name.toLowerCase().includes('statement') || d.name.toLowerCase().includes('rbc'));
       
       const updatedEmployer = {
@@ -222,7 +221,21 @@ export default function App() {
     }, 2000);
   };
 
-  // STEP 2 WIZARD: ID FRONT THEN SELFIE
+  // STEP 2 CAMERA CAPTURE HANDLERS
+  const handleIdCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIdFrontFile(file);
+    setIdFrontPreview(URL.createObjectURL(file));
+  };
+
+  const handleSelfieCapture = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSelfieFile(file);
+    setSelfiePreview(URL.createObjectURL(file));
+  };
+
   const handleBiometricVerification = async () => {
     setIsAnalyzingBiometrics(true);
     setTimeout(async () => {
@@ -480,34 +493,41 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* STEP 2: ID & SELFIE WIZARD */}
+                  {/* STEP 2: ID & SELFIE CAMERA CAPTURE WIZARD */}
                   {verificationStep === 2 && (
                     <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-4`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Camera className="w-5 h-5 text-purple-500" />
                           <div>
-                            <h4 className="text-xs font-bold text-white">Step 2: Canadian ID & Selfie Wizard</h4>
-                            <p className="text-[10px] text-purple-400 font-medium">{idSubStep === 1 ? 'Step 2A: Photo of Canadian Driver ID Front' : 'Step 2B: Live 3D Liveness Selfie'}</p>
+                            <h4 className="text-xs font-bold text-white">Step 2: Canadian ID & Selfie Camera</h4>
+                            <p className="text-[10px] text-purple-400 font-medium">{idSubStep === 1 ? 'Step 2A: Photo of Canadian Driver ID' : 'Step 2B: Live Biometric Selfie'}</p>
                           </div>
                         </div>
                         <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-bold">
-                          Sub-step {idSubStep} / 2
+                          Step {idSubStep} / 2
                         </span>
                       </div>
 
                       {idSubStep === 1 ? (
                         <div className="space-y-3 text-xs">
-                          <label className="border-2 border-dashed border-slate-800 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 bg-slate-900/60">
-                            <CreditCard className="w-7 h-7 text-purple-400 mb-1" />
-                            <span className="text-xs text-slate-200 font-semibold text-center">
-                              {idFrontFile ? idFrontFile.name : "Tap to take photo of Driver's License FRONT"}
+                          <label className="border-2 border-dashed border-purple-500/40 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 bg-slate-900/60 transition-colors">
+                            {idFrontPreview ? (
+                              <img src={idFrontPreview} alt="ID Preview" className="w-full h-32 object-cover rounded-lg border border-purple-500/50 mb-2" />
+                            ) : (
+                              <CreditCard className="w-8 h-8 text-purple-400 mb-1" />
+                            )}
+                            <span className="text-xs text-slate-200 font-bold text-center">
+                              {idFrontFile ? 'Driver License Captured! Tap to Retake' : "Tap to Open Camera for Driver's License"}
                             </span>
-                            <span className="text-[10px] text-slate-500 mt-1">Extracts Full Legal Name, DL Number, DOB & Expiry</span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">Triggers phone camera to scan license front</span>
+                            
+                            {/* REAR CAMERA TRIGGER INPUT */}
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => setIdFrontFile(e.target.files[0] || { name: 'Canadian_DL_Front.jpg' })}
+                              capture="environment"
+                              onChange={handleIdCapture}
                               className="hidden"
                             />
                           </label>
@@ -525,23 +545,28 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="space-y-3 text-xs">
-                          <div className="border-2 border-dashed border-purple-500/50 rounded-xl p-5 flex flex-col items-center justify-center bg-purple-950/20 text-center space-y-2">
-                            <div className="w-16 h-16 rounded-full bg-purple-900/40 border-2 border-purple-400 flex items-center justify-center">
-                              <UserCheck className="w-8 h-8 text-purple-300" />
-                            </div>
-                            <span className="text-xs text-slate-200 font-semibold">Position face in center of camera frame</span>
-                            <span className="text-[10px] text-slate-400">Compares facial biometric geometry against Canadian ID photo</span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelfieCaptured(true)}
-                            className={`w-full py-2 rounded-lg border text-xs font-bold flex items-center justify-center gap-2 ${
-                              selfieFile ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-slate-800 bg-slate-900 text-slate-300'
-                            }`}
-                          >
-                            <Camera className="w-4 h-4" /> {selfieFile ? 'Selfie Captured & Verified' : 'Capture Live Selfie'}
-                          </button>
+                          <label className="border-2 border-dashed border-purple-500/40 rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 bg-purple-950/20 text-center transition-colors">
+                            {selfiePreview ? (
+                              <img src={selfiePreview} alt="Selfie Preview" className="w-24 h-24 rounded-full object-cover border-2 border-purple-400 mb-2 shadow-lg" />
+                            ) : (
+                              <div className="w-16 h-16 rounded-full bg-purple-900/40 border-2 border-purple-400 flex items-center justify-center mb-1">
+                                <UserCheck className="w-8 h-8 text-purple-300" />
+                              </div>
+                            )}
+                            <span className="text-xs text-slate-200 font-bold">
+                              {selfieFile ? 'Selfie Captured! Tap to Retake' : 'Tap to Open Front Selfie Camera'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">Triggers front selfie camera for liveness match</span>
+                            
+                            {/* FRONT SELFIE CAMERA TRIGGER INPUT */}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="user"
+                              onChange={handleSelfieCapture}
+                              className="hidden"
+                            />
+                          </label>
 
                           <div className="flex gap-2 pt-1">
                             <button
@@ -835,19 +860,27 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-3 text-center pt-1">
                 <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex flex-col items-center print:bg-slate-100 print:border-slate-400">
-                  <div className="w-20 h-14 bg-gradient-to-br from-blue-900/40 to-slate-800 rounded border border-blue-500/30 flex flex-col items-center justify-center p-1 text-slate-200 print:text-black print:border-blue-700">
-                    <User className="w-6 h-6 text-blue-400 mb-0.5 print:text-blue-800" />
-                    <span className="text-[7px] font-mono uppercase font-bold">CANADIAN DL</span>
-                  </div>
-                  <span className="text-[8px] text-slate-400 print:text-slate-700 mt-1">Scanned ID Card Photo</span>
+                  {idFrontPreview ? (
+                    <img src={idFrontPreview} alt="Captured DL" className="w-20 h-14 object-cover rounded border border-blue-500 mb-1" />
+                  ) : (
+                    <div className="w-20 h-14 bg-gradient-to-br from-blue-900/40 to-slate-800 rounded border border-blue-500/30 flex flex-col items-center justify-center p-1 text-slate-200 print:text-black print:border-blue-700 mb-1">
+                      <User className="w-6 h-6 text-blue-400 mb-0.5 print:text-blue-800" />
+                      <span className="text-[7px] font-mono uppercase font-bold">CANADIAN DL</span>
+                    </div>
+                  )}
+                  <span className="text-[8px] text-slate-400 print:text-slate-700">Scanned ID Card Photo</span>
                 </div>
 
                 <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex flex-col items-center print:bg-slate-100 print:border-slate-400">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500/50 flex flex-col items-center justify-center p-1 text-purple-200 print:text-black print:border-purple-700">
-                    <UserCheck className="w-6 h-6 text-purple-400 print:text-purple-800" />
-                    <span className="text-[7px] font-mono uppercase font-bold">3D SELFIE</span>
-                  </div>
-                  <span className="text-[8px] text-slate-400 print:text-slate-700 mt-1">Live Liveness Selfie</span>
+                  {selfiePreview ? (
+                    <img src={selfiePreview} alt="Captured Selfie" className="w-14 h-14 rounded-full object-cover border-2 border-purple-500 mb-1" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-900/40 to-slate-800 border-2 border-purple-500/50 flex flex-col items-center justify-center p-1 text-purple-200 print:text-black print:border-purple-700 mb-1">
+                      <UserCheck className="w-6 h-6 text-purple-400 print:text-purple-800" />
+                      <span className="text-[7px] font-mono uppercase font-bold">3D SELFIE</span>
+                    </div>
+                  )}
+                  <span className="text-[8px] text-slate-400 print:text-slate-700">Live Liveness Selfie</span>
                 </div>
               </div>
             </div>
