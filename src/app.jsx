@@ -6,11 +6,11 @@ import {
   Building, Fingerprint, Layers, Sliders, ChevronRight,
   TrendingUp, FileSpreadsheet, ArrowUpRight, ArrowDownRight,
   Sparkles, Check, ExternalLink, Sun, Moon, Calendar, X,
-  Printer, Download, Activity, Database, Settings
+  Printer, Download, Plus, Link as LinkIcon, Copy, ArrowRight
 } from 'lucide-react';
 
-// --- MOCK DATABASE DATA ---
-const MOCK_DEALERSHIPS = [
+// --- INITIAL MOCK DATA ---
+const INITIAL_DEALERSHIPS = [
   { id: 'ALL', name: 'All Dealership Partners' },
   { id: 'Metro Ford Sales', name: 'Metro Ford Sales', activeDeals: 12, status: 'Connected', riskScore: 'Low Risk' },
   { id: 'Apex Exotic Motors', name: 'Apex Exotic Motors', activeDeals: 4, status: 'Flagged', riskScore: 'High Risk' },
@@ -29,9 +29,9 @@ const INITIAL_DEALS = [
     status: 'FUNDABLE',
     submittedAt: '2026-08-24',
     verifications: {
-      income: { status: 'PASSED', verifiedAmount: 8450, variance: -0.0058, source: 'FDX Direct Bank API', details: 'Verified $8,450/mo average across W-2 Payroll & Gig Income.' },
-      id: { status: 'PASSED', score: 99, source: 'AAMVA DB + Biometrics', details: 'AAMVA barcode validated. Facial liveness match: 99.2%.' },
-      signature: { status: 'PASSED', score: 100, source: 'PKI Timestamp & IP Forensics', details: 'Cryptographic signature hash valid. IP geolocated to home address.' }
+      income: { status: 'PASSED', verifiedAmount: 8450, details: 'Verified $8,450/mo average across W-2 Payroll & Gig Income.' },
+      id: { status: 'PASSED', score: 99, details: 'AAMVA barcode validated. Facial liveness match: 99.2%.' },
+      signature: { status: 'PASSED', score: 100, details: 'Cryptographic signature hash valid. IP geolocated to home address.' }
     }
   },
   {
@@ -45,43 +45,41 @@ const INITIAL_DEALS = [
     status: 'LOCKED',
     submittedAt: '2026-08-20',
     verifications: {
-      income: { status: 'FAILED', verifiedAmount: 7200, variance: -0.4000, source: 'FDX Direct Bank API', details: 'Income discrepancy alert: Stated $12,000 vs Verified $7,200.' },
-      id: { status: 'PASSED', score: 98, source: 'AAMVA DB + Biometrics', details: 'AAMVA barcode validated. Facial liveness match: 98.4%.' },
-      signature: { status: 'PASSED', score: 97, source: 'PKI Timestamp & IP Forensics', details: 'Signature captured on mobile browser.' }
-    }
-  },
-  {
-    id: 'DEAL-1096',
-    client: { name: 'Alex Rivera', ssn: '***-**-7741', email: 'arivera@example.com' },
-    vehicle: '2025 Honda CR-V Hybrid',
-    vin: '7FARW2H84RH091238',
-    dealership: 'Suburban Honda',
-    financeAmount: 34100,
-    statedIncome: 5200,
-    status: 'LOCKED',
-    submittedAt: '2026-08-15',
-    verifications: {
-      income: { status: 'PASSED', verifiedAmount: 5150, variance: -0.0096, source: 'FDX Direct Bank API', details: 'Verified via 3 consecutive direct deposits.' },
-      id: { status: 'FAILED', score: 42, source: 'OCR Visual Forensics', details: 'FRAUD ALERT: Font misalignment detected in License DOB field.' },
-      signature: { status: 'PASSED', score: 96, source: 'PKI Timestamp & IP Forensics', details: 'Signature verified against audit log.' }
+      income: { status: 'FAILED', verifiedAmount: 7200, details: 'Income discrepancy alert: Stated $12,000 vs Verified $7,200.' },
+      id: { status: 'PASSED', score: 98, details: 'AAMVA barcode validated.' },
+      signature: { status: 'PASSED', score: 97, details: 'Signature captured on mobile browser.' }
     }
   }
-];
-
-const INITIAL_AUDIT_LOGS = [
-  { id: 'LOG-8801', timestamp: '2026-08-24 19:42:10', event: 'FDX Bank Direct Verification Executed', dealId: 'DEAL-1094', status: 'SUCCESS' },
-  { id: 'LOG-8802', timestamp: '2026-08-24 18:15:22', event: 'AAMVA Biometric Match Passed (99.2%)', dealId: 'DEAL-1094', status: 'SUCCESS' },
-  { id: 'LOG-8803', timestamp: '2026-08-20 14:02:05', event: 'Income Gate Auto-Lock Triggered (>10% Variance)', dealId: 'DEAL-1095', status: 'WARNING' },
-  { id: 'LOG-8804', timestamp: '2026-08-15 09:30:44', event: 'Document Tampering Detected in Drivers License', dealId: 'DEAL-1096', status: 'ALERT' }
 ];
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('DASHBOARD');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [deals, setDeals] = useState(INITIAL_DEALS);
+  const [dealerships] = useState(INITIAL_DEALERSHIPS);
+
+  // Active Modals & Views
   const [selectedDeal, setSelectedDeal] = useState(null);
+  const [isAddDealOpen, setIsAddDealOpen] = useState(false);
+  const [activeVerifyDeal, setActiveVerifyDeal] = useState(null);
+  const [verificationStep, setVerificationStep] = useState(1);
+  const [copiedLink, setCopiedLink] = useState(null);
+
+  // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDealership, setSelectedDealership] = useState('ALL');
+
+  // New Deal Form State
+  const [newDealForm, setNewDealForm] = useState({
+    clientName: '',
+    email: '',
+    ssn: '',
+    vehicle: '',
+    vin: '',
+    dealership: 'Metro Ford Sales',
+    financeAmount: '',
+    statedIncome: ''
+  });
 
   const theme = {
     bg: isDarkMode ? 'bg-[#0B0F17] text-slate-100' : 'bg-slate-50 text-slate-900',
@@ -105,6 +103,81 @@ export default function App() {
     });
   }, [deals, searchQuery, selectedDealership]);
 
+  // Handle New Deal Submission
+  const handleCreateDeal = (e) => {
+    e.preventDefault();
+    const newId = `DEAL-${Math.floor(1000 + Math.random() * 9000)}`;
+    const createdDeal = {
+      id: newId,
+      client: {
+        name: newDealForm.clientName || 'Unassigned Client',
+        ssn: newDealForm.ssn || '***-**-0000',
+        email: newDealForm.email || 'client@example.com'
+      },
+      vehicle: newDealForm.vehicle || '2026 Vehicle',
+      vin: newDealForm.vin || 'VIN-PENDING-123',
+      dealership: newDealForm.dealership,
+      financeAmount: Number(newDealForm.financeAmount) || 30000,
+      statedIncome: Number(newDealForm.statedIncome) || 5000,
+      status: 'PENDING_VERIFICATION',
+      submittedAt: new Date().toISOString().split('T')[0],
+      verifications: {
+        income: { status: 'PENDING', verifiedAmount: 0, details: 'Awaiting customer FDX bank connection.' },
+        id: { status: 'PENDING', score: 0, details: 'Awaiting AAMVA ID scan and biometric liveness.' },
+        signature: { status: 'PENDING', score: 0, details: 'Awaiting PKI digital contract signature.' }
+      }
+    };
+
+    setDeals([createdDeal, ...deals]);
+    setIsAddDealOpen(false);
+    setNewDealForm({ clientName: '', email: '', ssn: '', vehicle: '', vin: '', dealership: 'Metro Ford Sales', financeAmount: '', statedIncome: '' });
+  };
+
+  const copyVerificationLink = (dealId) => {
+    const link = `https://autoverify-pro.vercel.app/verify/${dealId}`;
+    navigator.clipboard?.writeText(link);
+    setCopiedLink(dealId);
+    setTimeout(() => setCopiedLink(null), 2000);
+  };
+
+  // Run Interactive Step-by-Step Verification Simulation
+  const handleSimulateStepPass = (dealId, step) => {
+    setDeals(prevDeals => prevDeals.map(d => {
+      if (d.id !== dealId) return d;
+      const updated = { ...d };
+      if (step === 1) {
+        updated.verifications.income = {
+          status: 'PASSED',
+          verifiedAmount: d.statedIncome,
+          details: `FDX API verified $${d.statedIncome.toLocaleString()}/mo deposit stream.`
+        };
+      } else if (step === 2) {
+        updated.verifications.id = {
+          status: 'PASSED',
+          score: 99,
+          details: 'Biometric liveness passed. Driver license matched against state database.'
+        };
+      } else if (step === 3) {
+        updated.verifications.signature = {
+          status: 'PASSED',
+          score: 100,
+          details: 'Cryptographic PKI signature logged with IP forensic audit.'
+        };
+        updated.status = 'FUNDABLE';
+      }
+      return updated;
+    }));
+
+    if (step < 3) {
+      setVerificationStep(step + 1);
+    } else {
+      setTimeout(() => {
+        setActiveVerifyDeal(null);
+        setVerificationStep(1);
+      }, 1200);
+    }
+  };
+
   return (
     <div className={`min-h-screen ${theme.bg} font-sans transition-colors duration-200`}>
       <div className="flex h-screen overflow-hidden">
@@ -118,34 +191,26 @@ export default function App() {
               </div>
               <div>
                 <h1 className="text-sm font-bold tracking-tight">AUTOVERIFY PRO</h1>
-                <p className={`text-[11px] ${theme.textMuted}`}>F&I Compliance Suite</p>
+                <p className={`text-[11px] ${theme.textMuted}`}>F&I Risk & Funding Engine</p>
               </div>
             </div>
 
             <nav className="p-3 space-y-1">
               <button
-                onClick={() => setCurrentPage('DASHBOARD')}
+                onClick={() => { setCurrentPage('DASHBOARD'); setActiveVerifyDeal(null); }}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  currentPage === 'DASHBOARD' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : `${theme.textMuted} ${theme.hover}`
+                  currentPage === 'DASHBOARD' && !activeVerifyDeal ? 'bg-blue-600 text-white shadow-md' : `${theme.textMuted} ${theme.hover}`
                 }`}
               >
                 <Car className="w-4 h-4" /> Deal Pipeline
               </button>
               <button
-                onClick={() => setCurrentPage('DEALERSHIPS')}
+                onClick={() => { setCurrentPage('DEALERSHIPS'); setActiveVerifyDeal(null); }}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  currentPage === 'DEALERSHIPS' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : `${theme.textMuted} ${theme.hover}`
+                  currentPage === 'DEALERSHIPS' ? 'bg-blue-600 text-white shadow-md' : `${theme.textMuted} ${theme.hover}`
                 }`}
               >
                 <Building className="w-4 h-4" /> Dealership Partners
-              </button>
-              <button
-                onClick={() => setCurrentPage('AUDIT_LOGS')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  currentPage === 'AUDIT_LOGS' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : `${theme.textMuted} ${theme.hover}`
-                }`}
-              >
-                <FileSpreadsheet className="w-4 h-4" /> Audit & Compliance Logs
               </button>
             </nav>
           </div>
@@ -167,19 +232,130 @@ export default function App() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className={`h-16 border-b ${theme.header} px-8 flex items-center justify-between shrink-0`}>
             <h2 className={`text-base font-bold ${theme.textMain}`}>
-              {currentPage === 'DASHBOARD' && 'F&I Funding Pipeline'}
-              {currentPage === 'DEALERSHIPS' && 'Dealer Network Management'}
-              {currentPage === 'AUDIT_LOGS' && 'System Audit Trail'}
+              {activeVerifyDeal ? `Customer Verification Portal (${activeVerifyDeal.id})` : 'F&I Funding Pipeline'}
             </h2>
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Engine Active
+            <div className="flex items-center gap-3">
+              {!activeVerifyDeal && (
+                <button
+                  onClick={() => setIsAddDealOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-blue-600/20"
+                >
+                  <Plus className="w-4 h-4" /> Add New Deal
+                </button>
+              )}
             </div>
           </header>
 
           <main className="flex-1 overflow-y-auto p-8 space-y-6">
             
-            {/* PAGE 1: DASHBOARD */}
-            {currentPage === 'DASHBOARD' && (
+            {/* INTERACTIVE CUSTOMER STEP-BY-STEP VERIFICATION PORTAL */}
+            {activeVerifyDeal ? (
+              <div className="max-w-2xl mx-auto space-y-6">
+                <div className={`p-6 rounded-3xl border ${theme.card} space-y-6 shadow-2xl`}>
+                  <div className="flex justify-between items-center border-b pb-4 border-slate-800">
+                    <div>
+                      <span className="text-xs font-bold text-blue-500 font-mono">STEP-BY-STEP VERIFICATION PORTAL</span>
+                      <h3 className="text-lg font-bold text-white">{activeVerifyDeal.client.name}</h3>
+                      <p className={`text-xs ${theme.textMuted}`}>{activeVerifyDeal.vehicle} • Financed Amount: ${activeVerifyDeal.financeAmount.toLocaleString()}</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveVerifyDeal(null)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                    >
+                      Exit Portal
+                    </button>
+                  </div>
+
+                  {/* Verification Step Progress Bar */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3].map((step) => (
+                      <div
+                        key={step}
+                        className={`h-2 rounded-full transition-all ${
+                          verificationStep > step || (step === 1 && activeVerifyDeal.verifications.income.status === 'PASSED') || (step === 2 && activeVerifyDeal.verifications.id.status === 'PASSED') || (step === 3 && activeVerifyDeal.verifications.signature.status === 'PASSED')
+                            ? 'bg-emerald-500'
+                            : verificationStep === step
+                            ? 'bg-blue-500 animate-pulse'
+                            : 'bg-slate-800'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* STEP 1: FDX Open Banking */}
+                  {verificationStep === 1 && (
+                    <div className={`p-6 rounded-2xl ${theme.innerCard} border ${theme.border} space-y-4`}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-xl bg-blue-600/10 text-blue-500">
+                          <DollarSign className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Step 1: Connect Direct Deposit Banking (FDX)</h4>
+                          <p className={`text-xs ${theme.textMuted}`}>Verify stated monthly income of ${activeVerifyDeal.statedIncome.toLocaleString()}/mo.</p>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-300">
+                        {activeVerifyDeal.verifications.income.details}
+                      </div>
+                      <button
+                        onClick={() => handleSimulateStepPass(activeVerifyDeal.id, 1)}
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Verify Bank Income Stream
+                      </button>
+                    </div>
+                  )}
+
+                  {/* STEP 2: ID & Biometrics */}
+                  {verificationStep === 2 && (
+                    <div className={`p-6 rounded-2xl ${theme.innerCard} border ${theme.border} space-y-4`}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-xl bg-purple-600/10 text-purple-500">
+                          <Fingerprint className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Step 2: State ID Scan & Facial Liveness</h4>
+                          <p className={`text-xs ${theme.textMuted}`}>Scan front/back of Driver's License and perform 3D liveness match.</p>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-300">
+                        {activeVerifyDeal.verifications.id.details}
+                      </div>
+                      <button
+                        onClick={() => handleSimulateStepPass(activeVerifyDeal.id, 2)}
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Pass Biometric & ID Verification
+                      </button>
+                    </div>
+                  )}
+
+                  {/* STEP 3: PKI Contract Signature */}
+                  {verificationStep === 3 && (
+                    <div className={`p-6 rounded-2xl ${theme.innerCard} border ${theme.border} space-y-4`}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 rounded-xl bg-indigo-600/10 text-indigo-500">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-white">Step 3: Execute PKI Encrypted e-Signature</h4>
+                          <p className={`text-xs ${theme.textMuted}`}>Cryptographically sign financing documents to unlock loan funding.</p>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-300">
+                        {activeVerifyDeal.verifications.signature.details}
+                      </div>
+                      <button
+                        onClick={() => handleSimulateStepPass(activeVerifyDeal.id, 3)}
+                        className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg"
+                      >
+                        <Unlock className="w-4 h-4" /> Execute Digital Signature & Complete Deal
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : currentPage === 'DASHBOARD' && (
               <div className="space-y-6">
                 <div className={`p-4 rounded-2xl border ${theme.card} flex flex-col sm:flex-row items-center justify-between gap-4`}>
                   <div className="relative w-full sm:w-96">
@@ -197,7 +373,7 @@ export default function App() {
                     onChange={(e) => setSelectedDealership(e.target.value)}
                     className={`px-3 py-2 rounded-xl text-xs font-medium ${theme.innerCard} ${theme.textMain} border ${theme.border}`}
                   >
-                    {MOCK_DEALERSHIPS.map(d => (
+                    {dealerships.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
@@ -209,9 +385,9 @@ export default function App() {
                       <tr>
                         <th className="py-4 px-5">Deal & Borrower</th>
                         <th className="py-4 px-5">Vehicle & Finance</th>
-                        <th className="py-4 px-5 text-center">FDX Income Gate</th>
-                        <th className="py-4 px-5 text-center">ID Liveness</th>
+                        <th className="py-4 px-5 text-center">FDX Income</th>
                         <th className="py-4 px-5 text-center">Status</th>
+                        <th className="py-4 px-5 text-center">Verification Link</th>
                         <th className="py-4 px-5 text-right">Action</th>
                       </tr>
                     </thead>
@@ -229,31 +405,37 @@ export default function App() {
                           </td>
                           <td className="py-4 px-5 text-center">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              deal.verifications.income.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                              deal.verifications.income.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-500' :
+                              deal.verifications.income.status === 'PENDING' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'
                             }`}>
                               {deal.verifications.income.status}
                             </span>
                           </td>
                           <td className="py-4 px-5 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              deal.verifications.id.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
-                            }`}>
-                              {deal.verifications.id.status} ({deal.verifications.id.score}%)
-                            </span>
-                          </td>
-                          <td className="py-4 px-5 text-center">
                             <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${
-                              deal.status === 'FUNDABLE' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                              deal.status === 'FUNDABLE' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                              deal.status === 'PENDING_VERIFICATION' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
                             }`}>
                               {deal.status}
                             </span>
                           </td>
+                          <td className="py-4 px-5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => copyVerificationLink(deal.id)}
+                                className={`px-2.5 py-1 rounded-lg ${theme.innerCard} border ${theme.border} text-[11px] font-mono flex items-center gap-1 text-slate-300 hover:text-white`}
+                              >
+                                {copiedLink === deal.id ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                                {copiedLink === deal.id ? 'Copied' : 'Copy Link'}
+                              </button>
+                            </div>
+                          </td>
                           <td className="py-4 px-5 text-right">
                             <button
-                              onClick={() => setSelectedDeal(deal)}
-                              className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-semibold text-xs inline-flex items-center gap-1 shadow-md"
+                              onClick={() => { setActiveVerifyDeal(deal); setVerificationStep(1); }}
+                              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs inline-flex items-center gap-1 shadow-md"
                             >
-                              <Eye className="w-3.5 h-3.5" /> Inspect
+                              Open Portal <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                           </td>
                         </tr>
@@ -265,9 +447,9 @@ export default function App() {
             )}
 
             {/* PAGE 2: DEALERSHIPS */}
-            {currentPage === 'DEALERSHIPS' && (
+            {currentPage === 'DEALERSHIPS' && !activeVerifyDeal && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {MOCK_DEALERSHIPS.filter(d => d.id !== 'ALL').map((dlr) => (
+                {dealerships.filter(d => d.id !== 'ALL').map((dlr) => (
                   <div key={dlr.id} className={`p-6 rounded-2xl border ${theme.card} space-y-4`}>
                     <div className="flex items-center justify-between">
                       <div className="p-3 rounded-xl bg-blue-600/10 text-blue-500">
@@ -283,99 +465,128 @@ export default function App() {
                       <h3 className={`text-base font-bold ${theme.textMain}`}>{dlr.name}</h3>
                       <p className={`text-xs ${theme.textMuted}`}>Integration: FDX Direct Webhook v5</p>
                     </div>
-                    <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} text-xs space-y-1.5`}>
-                      <div className="flex justify-between">
-                        <span className={theme.textMuted}>Active Pipeline Deals:</span>
-                        <span className="font-bold text-blue-500">{dlr.activeDeals}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className={theme.textMuted}>Dealer Risk Category:</span>
-                        <span className="font-bold text-slate-300">{dlr.riskScore}</span>
-                      </div>
-                    </div>
                   </div>
                 ))}
               </div>
             )}
-
-            {/* PAGE 3: AUDIT LOGS */}
-            {currentPage === 'AUDIT_LOGS' && (
-              <div className={`rounded-2xl border ${theme.card} overflow-hidden shadow-xl`}>
-                <table className="w-full text-left text-xs">
-                  <thead className={`${theme.innerCard} text-[11px] uppercase font-bold text-slate-400 border-b ${theme.border}`}>
-                    <tr>
-                      <th className="py-4 px-5">Log ID & Time</th>
-                      <th className="py-4 px-5">System Event</th>
-                      <th className="py-4 px-5">Deal Ref</th>
-                      <th className="py-4 px-5 text-right">Severity</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${theme.border}`}>
-                    {INITIAL_AUDIT_LOGS.map((log) => (
-                      <tr key={log.id} className={`${theme.hover} transition-colors`}>
-                        <td className="py-4 px-5">
-                          <div className="font-mono font-bold text-blue-500">{log.id}</div>
-                          <div className={`text-[10px] ${theme.textMuted}`}>{log.timestamp}</div>
-                        </td>
-                        <td className={`py-4 px-5 font-semibold ${theme.textMain}`}>{log.event}</td>
-                        <td className="py-4 px-5 font-mono text-slate-400">{log.dealId}</td>
-                        <td className="py-4 px-5 text-right">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            log.status === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-500' :
-                            log.status === 'WARNING' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'
-                          }`}>
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
           </main>
         </div>
       </div>
 
-      {/* INSPECTION MODAL */}
-      {selectedDeal && (
+      {/* CREATE NEW DEAL MODAL */}
+      {isAddDealOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className={`${theme.card} border rounded-3xl w-full max-w-2xl p-6 space-y-6 shadow-2xl`}>
+          <div className={`${theme.card} border rounded-3xl w-full max-w-lg p-6 space-y-6 shadow-2xl`}>
             <div className="flex justify-between items-center border-b pb-4 border-slate-800">
+              <h3 className="text-base font-bold text-white">Create New Deal Intake</h3>
+              <button onClick={() => setIsAddDealOpen(false)} className="text-slate-400 hover:text-white font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateDeal} className="space-y-4 text-xs">
               <div>
-                <h3 className="text-base font-bold text-white">Deal Inspection: {selectedDeal.id}</h3>
-                <p className={`text-xs ${theme.textMuted}`}>{selectedDeal.client.name} • {selectedDeal.vehicle}</p>
+                <label className="block text-slate-400 font-medium mb-1">Borrower Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. David Miller"
+                  value={newDealForm.clientName}
+                  onChange={(e) => setNewDealForm({ ...newDealForm, clientName: e.target.value })}
+                  className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                />
               </div>
-              <button onClick={() => setSelectedDeal(null)} className="text-slate-400 hover:text-white font-bold">✕</button>
-            </div>
 
-            <div className="space-y-3">
-              <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2`}>
-                <div className="flex justify-between text-xs">
-                  <span className={theme.textMuted}>FDX Income Verification Details:</span>
-                  <span className="font-bold text-emerald-500">${selectedDeal.verifications.income.verifiedAmount}/mo</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="david@example.com"
+                    value={newDealForm.email}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, email: e.target.value })}
+                    className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                  />
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{selectedDeal.verifications.income.details}</p>
-              </div>
-
-              <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-2`}>
-                <div className="flex justify-between text-xs">
-                  <span className={theme.textMuted}>ID & Facial Biometrics Check:</span>
-                  <span className="font-bold text-blue-500">{selectedDeal.verifications.id.score}% Match</span>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">SSN (Last 4)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="***-**-5512"
+                    value={newDealForm.ssn}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, ssn: e.target.value })}
+                    className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                  />
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{selectedDeal.verifications.id.details}</p>
               </div>
-            </div>
 
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setSelectedDeal(null)}
-                className="px-5 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-lg"
-              >
-                Close Inspection
-              </button>
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Vehicle Description</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="2025 Tesla Model Y"
+                    value={newDealForm.vehicle}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, vehicle: e.target.value })}
+                    className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Financed Amount ($)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="42000"
+                    value={newDealForm.financeAmount}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, financeAmount: e.target.value })}
+                    className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Stated Monthly Income ($)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="7500"
+                    value={newDealForm.statedIncome}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, statedIncome: e.target.value })}
+                    className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Dealership</label>
+                  <select
+                    value={newDealForm.dealership}
+                    onChange={(e) => setNewDealForm({ ...newDealForm, dealership: e.target.value })}
+                    className={`w-full ${theme.innerCard} border ${theme.border} rounded-xl px-3 py-2 ${theme.textMain} focus:outline-none focus:border-blue-500`}
+                  >
+                    {dealerships.filter(d => d.id !== 'ALL').map(d => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDealOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg"
+                >
+                  Create & Generate Link
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
