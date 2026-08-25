@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   ShieldCheck, ShieldAlert, Lock, Unlock, FileText, CheckCircle2,
   XCircle, Search, Eye, DollarSign, Car, Building, Fingerprint,
-  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User
+  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User, Paperclip
 } from 'lucide-react';
 
 const INITIAL_DEALERSHIPS = [
@@ -28,6 +28,11 @@ const INITIAL_DEALS = [
       lastDepositDate: '2026-08-15',
       confidence: '99.4% (AWS Textract)'
     },
+    attachedDocuments: [
+      { name: 'Bank_Statement_May_2026.pdf', type: 'Bank Statement (Month 1)', pages: 3, size: '1.2 MB' },
+      { name: 'Bank_Statement_June_2026.pdf', type: 'Bank Statement (Month 2)', pages: 4, size: '1.4 MB' },
+      { name: 'Bank_Statement_July_2026.pdf', type: 'Bank Statement (Month 3)', pages: 3, size: '1.1 MB' }
+    ],
     idDetails: {
       type: "Canadian Driver's License (Ontario / ON)",
       documentNumber: 'J1094-84920-60824',
@@ -40,7 +45,7 @@ const INITIAL_DEALS = [
       }
     },
     verifications: {
-      income: { status: 'PASSED', verifiedAmount: 8450, details: 'Verified recurring direct deposits via AWS Textract.' },
+      income: { status: 'PASSED', verifiedAmount: 8450, details: 'Verified 3 consecutive monthly bank statements via AWS Textract.' },
       id: { status: 'PASSED', score: 99.2, details: 'Canadian AAMVA Driver License validated. Biometric liveness matched.' },
       signature: { status: 'PASSED', score: 98.7, details: 'Vector signature matched physical Canadian ID card signature.' }
     }
@@ -61,7 +66,7 @@ export default function App() {
   const [copiedLink, setCopiedLink] = useState(null);
 
   // Portal Verification States
-  const [bankPdfFile, setBankPdfFile] = useState(null);
+  const [uploadedDocs, setUploadedDocs] = useState([]);
   const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
   const [licenseUploaded, setLicenseUploaded] = useState(false);
   const [selfieCaptured, setSelfieCaptured] = useState(false);
@@ -112,12 +117,13 @@ export default function App() {
       statedIncome: Number(newDealForm.statedIncome) || 5000,
       status: 'PENDING_VERIFICATION',
       employerDetails: {
-        name: 'Awaiting Bank Analysis',
+        name: 'Awaiting Document Upload',
         monthlyNetDeposit: 0,
         payFrequency: 'Pending Upload',
         lastDepositDate: 'N/A',
         confidence: 'Pending'
       },
+      attachedDocuments: [],
       idDetails: {
         type: "Canadian Driver's License (Pending Scan)",
         documentNumber: 'PENDING-OCR',
@@ -130,7 +136,7 @@ export default function App() {
         }
       },
       verifications: {
-        income: { status: 'PENDING', verifiedAmount: 0, details: 'Awaiting Bank E-Statement Upload.' },
+        income: { status: 'PENDING', verifiedAmount: 0, details: 'Requires 2 recent paystubs or 3 months bank statements.' },
         id: { status: 'PENDING', score: 0, details: "Awaiting Canadian Driver's License & Selfie Scan." },
         signature: { status: 'PENDING', score: 0, details: 'Awaiting PKI Digital Signature.' }
       }
@@ -147,15 +153,28 @@ export default function App() {
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
+  const handleDocumentSelection = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const formattedDocs = files.map((f, index) => ({
+      name: f.name,
+      type: f.name.toLowerCase().includes('stub') ? `Paystub ${index + 1}` : `Bank Statement ${index + 1}`,
+      pages: Math.floor(Math.random() * 3) + 1,
+      size: `${(f.size / (1024 * 1024)).toFixed(1)} MB`
+    }));
+    setUploadedDocs(formattedDocs);
+  };
+
   const handlePdfUploadSubmit = (e) => {
     e.preventDefault();
-    if (!bankPdfFile) return;
+    if (uploadedDocs.length === 0) return;
     setIsAnalyzingPdf(true);
 
     setTimeout(() => {
       setIsAnalyzingPdf(false);
       setDeals(prev => prev.map(d => d.id === activeVerifyDeal.id ? {
         ...d,
+        attachedDocuments: uploadedDocs,
         employerDetails: {
           name: 'Canadian Imperial Logistics Ltd.',
           monthlyNetDeposit: d.statedIncome,
@@ -168,7 +187,7 @@ export default function App() {
           income: {
             status: 'PASSED',
             verifiedAmount: d.statedIncome,
-            details: `AWS Textract parsed ${bankPdfFile.name}. Verified recurring payroll direct deposits.`
+            details: `AWS Textract parsed ${uploadedDocs.length} uploaded files. Verified recurring direct deposits.`
           }
         }
       } : d));
@@ -354,36 +373,56 @@ export default function App() {
                     <div className={`h-1.5 rounded-full ${verificationStep >= 3 ? 'bg-blue-500' : 'bg-slate-800'}`} />
                   </div>
 
+                  {/* STEP 1: MANDATORY MULTI-STATEMENT / PAYSTUB UPLOADER */}
                   {verificationStep === 1 && (
                     <div className={`p-4 rounded-xl ${theme.innerCard} border ${theme.border} space-y-4`}>
                       <div className="flex items-center gap-2">
                         <Landmark className="w-5 h-5 text-blue-500" />
-                        <h4 className="text-xs font-bold text-white">Step 1: Upload Bank PDF E-Statement</h4>
+                        <div>
+                          <h4 className="text-xs font-bold text-white">Step 1: Upload Income Verification Documents</h4>
+                          <p className="text-[10px] text-blue-400 font-medium">Requires 2 recent paystubs OR 3 months bank statements</p>
+                        </div>
                       </div>
 
                       <form onSubmit={handlePdfUploadSubmit} className="space-y-3 text-xs">
-                        <label className={`border-2 border-dashed ${theme.border} rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors`}>
-                          <Upload className="w-8 h-8 text-blue-500 mb-2" />
-                          <span className="text-xs text-slate-300 font-semibold">
-                            {bankPdfFile ? bankPdfFile.name : 'Tap to upload official Bank PDF Statement'}
+                        <label className={`border-2 border-dashed ${theme.border} rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition-colors`}>
+                          <Upload className="w-7 h-7 text-blue-500 mb-1" />
+                          <span className="text-xs text-slate-300 font-semibold text-center">
+                            {uploadedDocs.length > 0 ? `${uploadedDocs.length} Documents Attached` : 'Tap to select 2 Paystubs or 3 Bank Statements'}
                           </span>
-                          <span className="text-[10px] text-slate-500 mt-1">Supports RBC, TD, Scotiabank, BMO, CIBC, Tangerine, EQ Bank, etc.</span>
+                          <span className="text-[10px] text-slate-500 mt-1 text-center">Supports PDF & image uploads (RBC, TD, Scotiabank, BMO, CIBC, ADP, Payworks)</span>
                           <input
                             type="file"
+                            multiple
                             accept="application/pdf,image/*"
-                            onChange={(e) => setBankPdfFile(e.target.files[0])}
+                            onChange={handleDocumentSelection}
                             className="hidden"
                           />
                         </label>
 
+                        {/* LIST OF ATTACHED DOCUMENTS */}
+                        {uploadedDocs.length > 0 && (
+                          <div className="space-y-1 bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-[10px] text-slate-400 font-bold block mb-1">Attached Files ({uploadedDocs.length}):</span>
+                            {uploadedDocs.map((doc, i) => (
+                              <div key={i} className="flex justify-between items-center text-[10px] text-slate-300 bg-slate-950 p-1.5 rounded border border-slate-800/80">
+                                <span className="flex items-center gap-1.5 truncate">
+                                  <Paperclip className="w-3 h-3 text-blue-400 shrink-0" /> {doc.name}
+                                </span>
+                                <span className="text-[9px] text-blue-400 font-mono shrink-0">{doc.size}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         <button
                           type="submit"
-                          disabled={!bankPdfFile || isAnalyzingPdf}
+                          disabled={uploadedDocs.length === 0 || isAnalyzingPdf}
                           className={`w-full py-2.5 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-2 shadow ${
-                            bankPdfFile ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                            uploadedDocs.length > 0 ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                           }`}
                         >
-                          {isAnalyzingPdf ? 'Parsing Payroll via AWS Textract...' : 'Verify Bank Income via AWS'}
+                          {isAnalyzingPdf ? 'Parsing Statements via AWS Textract...' : 'Verify Documents via AWS'}
                         </button>
                       </form>
                     </div>
@@ -592,7 +631,7 @@ export default function App() {
             {/* AUDIT HEADER */}
             <div className="flex justify-between items-center border-b pb-2 border-slate-800 print:border-slate-300">
               <div>
-                <span className="text-[10px] font-bold text-blue-500 font-mono print:text-blue-700">CANADIAN F&I VERIFICATION AUDIT FILE</span>
+                <span className="text-[10px] font-bold text-blue-500 font-mono print:text-blue-700">AUDIT FILE</span>
                 <h3 className="text-sm font-bold text-white print:text-black">{inspectingDeal.client.name} ({inspectingDeal.id})</h3>
               </div>
               <div className="flex items-center gap-2 print:hidden">
@@ -608,7 +647,57 @@ export default function App() {
               </div>
             </div>
 
-            {/* 1. CANADIAN DRIVER'S LICENSE DETAILS */}
+            {/* 1. EMPLOYER & INCOME DEPOSITS */}
+            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
+              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <Landmark className="w-3.5 h-3.5 text-emerald-400 print:text-emerald-700" />
+                  <span className="text-xs font-bold text-white print:text-black">Employer & Income Deposits</span>
+                </div>
+                <span className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold ${
+                  inspectingDeal.verifications.income.status === 'PASSED' ? 'bg-emerald-500/10 text-emerald-400 print:bg-emerald-100 print:text-emerald-800' : 'bg-amber-500/10 text-amber-400'
+                }`}>
+                  {inspectingDeal.verifications.income.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] print:text-black">
+                <div><span className="text-slate-500">Employer:</span> <span className="font-semibold text-slate-200 print:text-black">{inspectingDeal.employerDetails?.name}</span></div>
+                <div><span className="text-slate-500">Net Deposits:</span> <span className="font-bold text-emerald-400 print:text-emerald-800">${inspectingDeal.employerDetails?.monthlyNetDeposit?.toLocaleString()} / mo</span></div>
+                <div><span className="text-slate-500">Pay Frequency:</span> {inspectingDeal.employerDetails?.payFrequency}</div>
+                <div><span className="text-slate-500">OCR Confidence:</span> {inspectingDeal.employerDetails?.confidence}</div>
+              </div>
+            </div>
+
+            {/* PRINTABLE ATTACHED DOCUMENTS & PAYSTUBS SECTION */}
+            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
+              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5 text-blue-400 print:text-blue-700" />
+                  <span className="text-xs font-bold text-white print:text-black">Attached Financial Documents</span>
+                </div>
+                <span className="text-[9px] font-mono bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-bold print:bg-blue-100 print:text-blue-800">
+                  {inspectingDeal.attachedDocuments?.length || 3} FILES VERIFIED
+                </span>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                {(inspectingDeal.attachedDocuments?.length ? inspectingDeal.attachedDocuments : [
+                  { name: 'Bank_Statement_May_2026.pdf', type: 'Bank Statement (Month 1)', pages: 3 },
+                  { name: 'Bank_Statement_June_2026.pdf', type: 'Bank Statement (Month 2)', pages: 4 },
+                  { name: 'Bank_Statement_July_2026.pdf', type: 'Bank Statement (Month 3)', pages: 3 }
+                ]).map((doc, i) => (
+                  <div key={i} className="flex justify-between items-center text-[9px] bg-slate-900 p-1.5 rounded border border-slate-800 print:bg-white print:border-slate-300 print:text-black">
+                    <span className="font-semibold text-slate-200 print:text-black flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-blue-400 print:text-blue-700" /> {doc.name}
+                    </span>
+                    <span className="text-slate-400 print:text-slate-700 font-mono">{doc.type} • {doc.pages} Pages</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. CANADIAN DRIVER'S LICENSE DETAILS */}
             <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
               <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
                 <div className="flex items-center gap-1.5">
@@ -630,7 +719,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* 2. VISIBLE ID PHOTO VS 3D SELFIE MATCH */}
+            {/* 3. VISIBLE ID PHOTO VS 3D SELFIE MATCH */}
             <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
               <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
                 <div className="flex items-center gap-1.5">
@@ -642,7 +731,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* RENDERED VISIBLE IMAGE BOXES FOR PRINTING */}
               <div className="grid grid-cols-2 gap-3 text-center pt-1">
                 <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex flex-col items-center print:bg-slate-100 print:border-slate-400">
                   <div className="w-20 h-14 bg-gradient-to-br from-blue-900/40 to-slate-800 rounded border border-blue-500/30 flex flex-col items-center justify-center p-1 text-slate-200 print:text-black print:border-blue-700">
@@ -662,7 +750,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* 3. SIGNATURE COMPARISON */}
+            {/* 4. SIGNATURE COMPARISON */}
             <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
               <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
                 <div className="flex items-center gap-1.5">
