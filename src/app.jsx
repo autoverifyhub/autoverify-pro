@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   ShieldCheck, ShieldAlert, Lock, Unlock, FileText, CheckCircle2,
   XCircle, Search, Eye, DollarSign, Car, Building, Fingerprint,
-  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User, Paperclip
+  Sun, Moon, Plus, Copy, ArrowRight, Camera, Check, Landmark, UserCheck, Upload, X, Home, FileSpreadsheet, ChevronRight, CreditCard, Printer, User, Paperclip, ExternalLink
 } from 'lucide-react';
 
 const INITIAL_DEALERSHIPS = [
@@ -219,6 +219,34 @@ export default function App() {
       } : d));
       setVerificationStep(3);
     }, 1800);
+  };
+
+  const openDocumentInNewTab = (docName) => {
+    const dummyHtml = `
+      <html>
+        <head>
+          <title>${docName} - AutoVerify Pro Audit</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; background: #0b0f17; color: white; text-align: center; }
+            .card { background: #0f1623; border: 1px solid #1e293b; padding: 30px; border-radius: 16px; max-w: 600px; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+            h2 { color: #3b82f6; margin-top: 0; }
+            .btn { display: inline-block; background: #2563eb; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 20px; cursor: pointer; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>DOCUMENT VERIFICATION AUDIT</h2>
+            <p><strong>File Name:</strong> ${docName}</p>
+            <p><strong>AWS Textract Status:</strong> Verified Direct Deposit Stream</p>
+            <p><em>Official PDF Document Stream Rendered for Print & Compliance</em></p>
+            <button class="btn" onclick="window.print()">Print Document</button>
+          </div>
+        </body>
+      </html>
+    `;
+    const blob = new Blob([dummyHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
   };
 
   const startDrawing = (e) => {
@@ -669,17 +697,19 @@ export default function App() {
               </div>
             </div>
 
-            {/* PRINTABLE ATTACHED DOCUMENTS & PAYSTUBS SECTION */}
-            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:border-slate-300 print:bg-slate-50`}>
-              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800 print:border-slate-300">
+            {/* INTERACTIVE ATTACHED FINANCIAL DOCUMENTS CARD (HIDDEN ON PRINT TO PRESERVE 1-PAGE LAYOUT) */}
+            <div className={`p-3 rounded-xl ${theme.innerCard} border ${theme.border} space-y-1.5 print:hidden`}>
+              <div className="flex items-center justify-between border-b pb-1.5 border-slate-800">
                 <div className="flex items-center gap-1.5">
-                  <Paperclip className="w-3.5 h-3.5 text-blue-400 print:text-blue-700" />
-                  <span className="text-xs font-bold text-white print:text-black">Attached Financial Documents</span>
+                  <Paperclip className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-xs font-bold text-white">Attached Financial Documents</span>
                 </div>
-                <span className="text-[9px] font-mono bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-bold print:bg-blue-100 print:text-blue-800">
-                  {inspectingDeal.attachedDocuments?.length || 3} FILES VERIFIED
+                <span className="text-[9px] font-mono bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded font-bold">
+                  {inspectingDeal.attachedDocuments?.length || 3} FILES ATTACHED
                 </span>
               </div>
+
+              <p className="text-[9px] text-slate-400">Tap any file below to open and print the document in a separate browser tab:</p>
 
               <div className="space-y-1 pt-1">
                 {(inspectingDeal.attachedDocuments?.length ? inspectingDeal.attachedDocuments : [
@@ -687,12 +717,18 @@ export default function App() {
                   { name: 'Bank_Statement_June_2026.pdf', type: 'Bank Statement (Month 2)', pages: 4 },
                   { name: 'Bank_Statement_July_2026.pdf', type: 'Bank Statement (Month 3)', pages: 3 }
                 ]).map((doc, i) => (
-                  <div key={i} className="flex justify-between items-center text-[9px] bg-slate-900 p-1.5 rounded border border-slate-800 print:bg-white print:border-slate-300 print:text-black">
-                    <span className="font-semibold text-slate-200 print:text-black flex items-center gap-1">
-                      <FileText className="w-3 h-3 text-blue-400 print:text-blue-700" /> {doc.name}
+                  <button
+                    key={i}
+                    onClick={() => openDocumentInNewTab(doc.name)}
+                    className="w-full flex justify-between items-center text-[9px] bg-slate-900 hover:bg-slate-800 p-2 rounded border border-slate-800 text-left transition-colors"
+                  >
+                    <span className="font-semibold text-blue-400 flex items-center gap-1 truncate">
+                      <FileText className="w-3 h-3 text-blue-400 shrink-0" /> {doc.name}
                     </span>
-                    <span className="text-slate-400 print:text-slate-700 font-mono">{doc.type} • {doc.pages} Pages</span>
-                  </div>
+                    <span className="text-slate-400 font-mono flex items-center gap-1 shrink-0">
+                      {doc.type} <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
