@@ -1,29 +1,27 @@
 import { TextractClient, AnalyzeDocumentCommand } from '@aws-sdk/client-textract';
 import { RekognitionClient, CompareFacesCommand } from '@aws-sdk/client-rekognition';
 
-// Reads custom environment variables to bypass Netlify's reserved key lock
-const awsRegion = process.env.APP_AWS_REGION || process.env.AWS_REGION || 'us-east-1';
+const awsRegion = process.env.AWS_REGION || 'us-east-1';
 const awsCredentials = {
-  accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
-  secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || ''
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
 };
 
 const textractClient = new TextractClient({ region: awsRegion, credentials: awsCredentials });
 const rekognitionClient = new RekognitionClient({ region: awsRegion, credentials: awsCredentials });
 
-export default async (req) => {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const body = await req.json();
-    const { action, documentBufferBase64, idPhotoBase64, selfiePhotoBase64 } = body;
+    const { action, documentBufferBase64, idPhotoBase64, selfiePhotoBase64 } = req.body;
 
-    // 1. REAL AWS TEXTRACT DOCUMENT OCR
+    // 1. AWS TEXTRACT DOCUMENT PARSER
     if (action === 'PARSE_DOCUMENT') {
       const base64Data = documentBufferBase64.includes(',') ? documentBufferBase64.split(',')[1] : documentBufferBase64;
-      const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const imageBytes = Buffer.from(base64Data, 'base64');
 
       const textractCommand = new AnalyzeDocumentCommand({
         Document: { Bytes: imageBytes },
@@ -48,21 +46,21 @@ export default async (req) => {
         extractedNetDeposit = 3950;
       }
 
-      return new Response(JSON.stringify({
+      return res.status(200).json({
         success: true,
         employer: extractedEmployer,
         monthlyNetDeposit: extractedNetDeposit,
         rawTextLines: detectedLines.slice(0, 15)
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      });
     }
 
-    // 2. REAL AWS REKOGNITION COMPAREFACES
+    // 2. AWS REKOGNITION COMPAREFACES
     if (action === 'COMPARE_FACES') {
       const idData = idPhotoBase64.includes(',') ? idPhotoBase64.split(',')[1] : idPhotoBase64;
       const selfieData = selfiePhotoBase64.includes(',') ? selfiePhotoBase64.split(',')[1] : selfiePhotoBase64;
 
-      const sourceBytes = Uint8Array.from(atob(idData), c => c.charCodeAt(0));
-      const targetBytes = Uint8Array.from(atob(selfieData), c => c.charCodeAt(0));
+      const sourceBytes = Buffer.from(idData, 'base64');
+      const targetBytes = Buffer.from(selfieData, 'base64');
 
       const rekognitionCommand = new CompareFacesCommand({
         SourceImage: { Bytes: sourceBytes },
@@ -75,27 +73,27 @@ export default async (req) => {
 
       if (faceMatches.length > 0) {
         const similarityScore = faceMatches[0].Similarity;
-        return new Response(JSON.stringify({
+        return res.status(200).json({
           success: true,
           passed: similarityScore >= 80,
           similarityScore: similarityScore.toFixed(1)
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        });
       } else {
-        return new Response(JSON.stringify({
+        return res.status(200).json({
           success: false,
           passed: false,
           similarityScore: 0.0,
           reason: 'FRAUD REJECTED: AWS Rekognition found no matching human face on the ID card.'
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        });
       }
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 });
+    return res.status(400).json({ error: 'Invalid action requested' });
   } catch (err) {
-    return new Response(JSON.stringify({
+    return res.status(500).json({
       success: false,
       passed: false,
       error: err.message || 'AWS API Processing Error'
-    }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    });
   }
-};
+}
